@@ -128,33 +128,35 @@
     }
 
     async function checkStatus(generateUuid) {
-      let tries = 0;
-      const interval = setInterval(async () => {
-        tries++;
-        const res = await fetch("/api/generate/status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ generateUuid })
-        });
+  let tries = 0;
+  const interval = setInterval(async () => {
+    tries++;
+    const res = await fetch("/api/generate/status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ generateUuid })
+    });
 
-        const result = await res.json();
-        if (result.status === "finished" && result.imageUrl) {
-          clearInterval(interval);
-          const img = document.getElementById("resultImage");
-          img.src = result.imageUrl;
-          img.style.display = "block";
-          img.style.opacity = 0;
-          setTimeout(() => img.style.opacity = 1, 50);
-          document.getElementById("loading").style.display = "none";
-        }
+    const result = await res.json();
 
-        if (tries >= 50) {
-          clearInterval(interval);
-          alert("生成超时，请稍后再试。");
-          document.getElementById("loading").style.display = "none";
-        }
-      }, 3000);
+    if (result.code === 0 && result.data.generateStatus === 5) {
+      clearInterval(interval);
+      const imgUrl = result.data.images[0].imageUrl;
+      const img = document.getElementById("resultImage");
+      img.src = imgUrl;
+      img.style.display = "block";
+      img.style.opacity = 0;
+      setTimeout(() => img.style.opacity = 1, 50);
+      document.getElementById("loading").style.display = "none";
     }
+
+    if (tries >= 20) {
+      clearInterval(interval);
+      alert("生成超时，请稍后再试。");
+      document.getElementById("loading").style.display = "none";
+    }
+  }, 3000);
+}
   </script>
 </body>
 </html>
