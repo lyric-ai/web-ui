@@ -1,75 +1,160 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
-    <meta charset="UTF-8">
-    <title>输入提示词生成图片</title>
+  <meta charset="UTF-8">
+  <title>图片生成器</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    #promptInput {
+      padding: 12px 16px;
+      font-size: 16px;
+      width: 300px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    #promptInput:focus {
+      border-color: #4a90e2;
+      box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #357ABD;
+    }
+
+    #loading {
+      margin-top: 20px;
+      font-size: 16px;
+      color: #555;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 3px solid #ccc;
+      border-top: 3px solid #4a90e2;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    #resultImage {
+      margin-top: 30px;
+      max-width: 90%;
+      max-height: 500px;
+      display: none;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      transition: opacity 0.5s ease;
+    }
+  </style>
 </head>
 <body>
-    <h2>请输入提示词</h2>
-    <input type="text" id="promptInput" placeholder="例如：A single peony flower">
-    <button onclick="generateImage()">开始生成</button>
-    <p id="loading" style="display:none;">生成中，请稍候...</p>
-    <img id="resultImage" src="" style="margin-top:20px;max-width:500px;display:none;">
-    
-    <script>
-        async function generateImage() {
-            const prompt = document.getElementById("promptInput").value.trim();
-            if (!prompt) {
-                alert("请输入提示词！");
-                return;
-            }
+  <h2>输入提示词生成图片</h2>
+  <input type="text" id="promptInput" placeholder="例如：A single peony flower">
+  <button onclick="generateImage()">开始生成</button>
 
-            document.getElementById("loading").style.display = "block";
-            document.getElementById("resultImage").style.display = "none";
+  <div id="loading" style="display:none;">
+    <div class="spinner"></div>
+    <span>生成中，请稍候...</span>
+  </div>
 
-            try {
-                // 向 Vercel 代理服务器发送请求
-                const response = await fetch("/api/generate", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ prompt })
-                });
+  <img id="resultImage" src="" alt="生成结果图像">
+  
+  <script>
+    async function generateImage() {
+      const prompt = document.getElementById("promptInput").value.trim();
+      if (!prompt) {
+        alert("请输入提示词！");
+        return;
+      }
 
-                const data = await response.json();
+      document.getElementById("loading").style.display = "flex";
+      document.getElementById("resultImage").style.display = "none";
 
-                if (response.status !== 200) {
-                    alert("生成失败: " + data.error);
-                    document.getElementById("loading").style.display = "none";
-                    return;
-                }
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
 
-                const generateUuid = data.generateUuid;
-                checkStatus(generateUuid);
-            } catch (error) {
-                alert("请求失败，请稍后再试");
-                document.getElementById("loading").style.display = "none";
-            }
+      const result = await res.json();
+      if (result.error) {
+        alert("生成失败: " + result.error);
+        document.getElementById("loading").style.display = "none";
+        return;
+      }
+
+      const { generateUuid } = result;
+      checkStatus(generateUuid);
+    }
+
+    async function checkStatus(generateUuid) {
+      let tries = 0;
+      const interval = setInterval(async () => {
+        tries++;
+        const res = await fetch("/api/generate/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ generateUuid })
+        });
+
+        const result = await res.json();
+        if (result.status === "finished" && result.imageUrl) {
+          clearInterval(interval);
+          const img = document.getElementById("resultImage");
+          img.src = result.imageUrl;
+          img.style.display = "block";
+          img.style.opacity = 0;
+          setTimeout(() => img.style.opacity = 1, 50);
+          document.getElementById("loading").style.display = "none";
         }
 
-        async function checkStatus(generateUuid) {
-            const statusUrl = "/api/generate/status"; // Vercel 的 API
-
-            const interval = setInterval(async () => {
-                const res = await fetch(statusUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ generateUuid })
-                });
-
-                const result = await res.json();
-
-                if (result.code === 0 && result.data.generateStatus === 5) {
-                    clearInterval(interval);
-                    const imgUrl = result.data.images[0].imageUrl;
-                    const img = document.getElementById("resultImage");
-                    img.src = imgUrl;
-                    img.style.display = "block";
-                    document.getElementById("loading").style.display = "none";
-                }
-            }, 3000); // 每3秒轮询一次
+        if (tries >= 20) {
+          clearInterval(interval);
+          alert("生成超时，请稍后再试。");
+          document.getElementById("loading").style.display = "none";
         }
-    </script>
+      }, 3000);
+    }
+  </script>
 </body>
 </html>
