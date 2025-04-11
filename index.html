@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>输入提示词生成图片</title>
+</head>
+<body>
+    <h2>请输入提示词</h2>
+    <input type="text" id="promptInput" placeholder="例如：A single peony flower">
+    <button onclick="generateImage()">开始生成</button>
+    <p id="loading" style="display:none;">生成中，请稍候...</p>
+    <img id="resultImage" src="" style="margin-top:20px;max-width:500px;display:none;">
+    
+    <script>
+        async function generateImage() {
+            const prompt = document.getElementById("promptInput").value.trim();
+            if (!prompt) {
+                alert("请输入提示词！");
+                return;
+            }
+
+            document.getElementById("loading").style.display = "block";
+            document.getElementById("resultImage").style.display = "none";
+
+            try {
+                // 向 Vercel 代理服务器发送请求
+                const response = await fetch("/api/generate", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ prompt })
+                });
+
+                const data = await response.json();
+
+                if (response.status !== 200) {
+                    alert("生成失败: " + data.error);
+                    document.getElementById("loading").style.display = "none";
+                    return;
+                }
+
+                const generateUuid = data.generateUuid;
+                checkStatus(generateUuid);
+            } catch (error) {
+                alert("请求失败，请稍后再试");
+                document.getElementById("loading").style.display = "none";
+            }
+        }
+
+        async function checkStatus(generateUuid) {
+            const statusUrl = "/api/generate/status"; // Vercel 的 API
+
+            const interval = setInterval(async () => {
+                const res = await fetch(statusUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ generateUuid })
+                });
+
+                const result = await res.json();
+
+                if (result.code === 0 && result.data.generateStatus === 5) {
+                    clearInterval(interval);
+                    const imgUrl = result.data.images[0].imageUrl;
+                    const img = document.getElementById("resultImage");
+                    img.src = imgUrl;
+                    img.style.display = "block";
+                    document.getElementById("loading").style.display = "none";
+                }
+            }, 3000); // 每3秒轮询一次
+        }
+    </script>
+</body>
+</html>
