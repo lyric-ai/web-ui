@@ -24,9 +24,22 @@ async function generateImage() {
       console.error("生成失败：", result.error);
       alert("生成失败，请重试！");
     } else {
-      const image = document.getElementById("resultImage");
-      image.src = result.imageUrl;
-      image.style.display = "block";
+      // 获取生成的图像 UUID
+      const generateUuid = result.generateUuid;
+
+      // 根据 UUID 请求生成的图像
+      const imageResponse = await fetch(`/api/generate-image?generateUuid=${generateUuid}`);
+      const imageUrl = await imageResponse.json();
+
+      if (imageUrl.error) {
+        console.error("获取图像失败：", imageUrl.error);
+        alert("获取图像失败，请重试！");
+      } else {
+        // 显示生成的图像
+        const image = document.getElementById("resultImage");
+        image.src = imageUrl.imageUrl; // 设置图片的 URL
+        image.style.display = "block"; // 显示图片
+      }
     }
   } catch (error) {
     document.getElementById("loading").style.display = "none";
