@@ -47,13 +47,7 @@ module.exports = async (req, res) => {
 
   try {
     // 调用生成接口
-    const response = await fetch(generateUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
+  
 
     const result = await response.json();
     console.log("生成请求返回的数据：", result); // 打印返回的数据
