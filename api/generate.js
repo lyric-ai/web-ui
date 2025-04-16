@@ -57,16 +57,19 @@ module.exports = async (req, res) => {
     });
 
     const result = await response.json();
+    console.log("生成请求返回的数据：", result); // 打印返回的数据
+
     if (result.code !== 0) {
       console.error("生成请求失败，错误信息：", result);
       return res.status(500).json({ error: "生成失败：" + result.msg });
     }
 
-    const generateUuid = result.data.generateUuid;
+    // 提取图像 URL
+    const imageUrl = result.data.images && result.data.images[0] ? result.data.images[0].imageUrl : null;
+    if (!imageUrl) {
+      return res.status(500).json({ error: "无法获取图像 URL" });
+    }
 
-    // 跳过状态查询部分，直接返回生成的图像 URL
-    // 假设生成的图像URL已经包含在result中（根据Liblib API的返回格式调整）
-    const imageUrl = result.data.imageUrl || "生成的图像 URL 可能需要调整返回格式";
     return res.status(200).json({ imageUrl });
 
   } catch (error) {
