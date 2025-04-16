@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
         class_type: "CLIPTextEncode",
         inputs: { text: flower }
       },
-      workflowUuid: "dee7984fcace4d40aa8bc99ff6a4dc36"
+      workflowUuid: "5f7cf756fd804deeac558322dc5bd813"
     }
   };
 
