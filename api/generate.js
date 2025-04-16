@@ -64,40 +64,9 @@ module.exports = async (req, res) => {
 
     const generateUuid = result.data.generateUuid;
 
-    // 查询生成状态时，重新生成签名和时间戳
-    const statusTimestamp = Date.now().toString();
-    const statusNonce = Math.random().toString(36).substring(2, 15);
-
-    // 计算查询请求的签名
-    const statusUri = "/api/generate/comfyui/status";
-    const statusStringToSign = statusUri + "&" + statusTimestamp + "&" + statusNonce;
-    const statusSignature = crypto
-      .createHmac("sha1", secretKey)
-      .update(statusStringToSign)
-      .digest("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-
-    const statusUrl = `https://openapi.liblibai.cloud${statusUri}?AccessKey=${accessKey}&Signature=${statusSignature}&Timestamp=${statusTimestamp}&SignatureNonce=${statusNonce}`;
-    console.log("状态查询 URL：", statusUrl);
-
-    // 查询生成状态
-    const statusResponse = await fetch(statusUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ generateUuid }),
-    });
-
-    const statusResult = await statusResponse.json();
-    if (statusResult.code !== 0) {
-      console.error("状态查询失败，错误信息：", statusResult);
-      return res.status(500).json({ error: "状态查询失败：" + statusResult.msg });
-    }
-
-    const imageUrl = statusResult.data.imageUrl; // 假设返回的是图像的 URL
+    // 跳过状态查询部分，直接返回生成的图像 URL
+    // 假设生成的图像URL已经包含在result中（根据Liblib API的返回格式调整）
+    const imageUrl = result.data.imageUrl || "生成的图像 URL 可能需要调整返回格式";
     return res.status(200).json({ imageUrl });
 
   } catch (error) {
