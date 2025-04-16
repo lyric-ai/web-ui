@@ -1,6 +1,4 @@
 // /api/generate/status.js
-import fetch from 'node-fetch';
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
@@ -28,6 +26,7 @@ export default async function handler(req, res) {
   const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfy/status?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
 
   try {
+    // 使用原生 fetch 代替 node-fetch
     const response = await fetch(statusUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -35,7 +34,12 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    res.status(200).json(data);
+    if (data.code !== 0) {
+      return res.status(500).json({ error: 'Error from Liblib API', message: data.msg });
+    }
+
+    // 如果状态为成功，返回结果数据
+    res.status(200).json(data.data);
   } catch (err) {
     console.error("Error checking status:", err);
     res.status(500).json({ error: "Failed to check status" });
