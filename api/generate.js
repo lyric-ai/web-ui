@@ -1,16 +1,17 @@
-async function generateImage() {
-  const flower = document.getElementById("flowerInput").value.trim();
-  const jellyfish = document.getElementById("jellyfishInput").value.trim();
+import fetch from 'node-fetch';
 
-  if (!flower || !jellyfish) {
-    alert("请输入花和水母的提示词！");
-    return;
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Only POST allowed' });
   }
 
-  // 显示加载中，并隐藏结果
-  document.getElementById("loading").style.display = "flex";
-  document.getElementById("resultImage").style.display = "none";
+  // 从请求体中获取花和水母的提示词
+  const { flower, jellyfish } = req.body;
+  if (!flower || !jellyfish) {
+    return res.status(400).json({ error: 'Missing flower or jellyfish prompt' });
+  }
 
+  // 请求体中的生成参数
   const requestBody = {
     templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
     generateParams: {
@@ -30,78 +31,59 @@ async function generateImage() {
     }
   };
 
+  // 使用环境变量中的 LIBLIB_ACCESS_KEY 和 LIBLIB_SECRET_KEY
+  const accessKey = process.env.LIBLIB_ACCESS_KEY;
+  const secretKey = process.env.LIBLIB_SECRET_KEY;
+
+  const timestamp = Date.now().toString();
+  const nonce = Math.random().toString(36).substring(2);
+  const uri = "/api/generate/comfyui/app";
+  const stringToSign = uri + "&" + timestamp + "&" + nonce;
+
+  const crypto = await import("crypto");
+  const hmac = crypto.createHmac("sha1", secretKey);
+  hmac.update(stringToSign);
+  const signature = hmac.digest("base64")
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+  const generateUrl = `https://openapi.liblibai.cloud/api/generate/comfyui/app?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
+
   try {
-    // 发送生成请求
-    const response = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
+    const response = await fetch(generateUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "AccessKey": "NRXABtFaq2nlj-fRV4685Q",
-        "SecretKey": "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf"
       },
       body: JSON.stringify(requestBody)
     });
 
-    // 检查是否请求成功
     const result = await response.json();
     if (result.code !== 0) {
-      alert("生成失败：" + result.msg);
-      document.getElementById("loading").style.display = "none";
-      return;
+      return res.status(500).json({ error: "Generation failed: " + result.msg });
     }
 
-    // 获取生成的 UUID 并检查状态
     const generateUuid = result.data.generateUuid;
-    checkStatus(generateUuid);
-  } catch (error) {
-    console.error("生成请求失败:", error);
-    alert("请求失败，请稍后再试。");
-    document.getElementById("loading").style.display = "none";
-  }
-}
 
-async function checkStatus(generateUuid) {
-  let tries = 0;
-  const interval = setInterval(async () => {
-    tries++;
+    // 检查生成状态
+    const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfy/status?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
+    const checkStatusResponse = await fetch(statusUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ generateUuid })
+    });
 
-    try {
-      // 查询生成状态
-      const res = await fetch("https://openapi.liblibai.cloud/api/generate/comfy/status", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "AccessKey": "NRXABtFaq2nlj-fRV4685Q",
-          "SecretKey": "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf"
-        },
-        body: JSON.stringify({ generateUuid })
-      });
-
-      const result = await res.json();
-
-      // 如果生成成功，显示图片
-      if (result.code === 0 && result.data.generateStatus === 5) {
-        clearInterval(interval);
-        const imgUrl = result.data.images[0].imageUrl;
-        const img = document.getElementById("resultImage");
-        img.src = imgUrl;
-        img.style.display = "block";
-        img.style.opacity = 0;
-        setTimeout(() => img.style.opacity = 1, 50);
-        document.getElementById("loading").style.display = "none";
-      }
-
-      // 如果超过尝试次数限制，停止查询
-      if (tries >= 20) {
-        clearInterval(interval);
-        alert("生成超时，请稍后再试。");
-        document.getElementById("loading").style.display = "none";
-      }
-    } catch (error) {
-      console.error("检查生成状态失败:", error);
-      clearInterval(interval);
-      alert("检查状态失败，请稍后再试。");
-      document.getElementById("loading").style.display = "none";
+    const statusResult = await checkStatusResponse.json();
+    if (statusResult.code === 0 && statusResult.data.generateStatus === 5) {
+      const imgUrl = statusResult.data.images[0].imageUrl;
+      return res.status(200).json({ imageUrl: imgUrl });
+    } else {
+      return res.status(500).json({ error: "Failed to generate image or status not ready." });
     }
-  }, 3000);
+
+  } catch (err) {
+    console.error("Error during generation process:", err);
+    return res.status(500).json({ error: "An error occurred during the generation process." });
+  }
 }
