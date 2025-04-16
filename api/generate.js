@@ -1,5 +1,20 @@
 import crypto from "crypto";
 
+// 轮询等待图像生成的函数
+async function waitForImage(uuid, maxTries = 10, delay = 2000) {
+  for (let i = 0; i < maxTries; i++) {
+    const imageResp = await fetch(`https://openapi.liblibai.cloud/api/generate/comfyui/image/${uuid}`);
+    const imageJson = await imageResp.json();
+
+    if (imageJson?.data?.url) {
+      return imageJson.data.url;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, delay)); // 等待 delay 毫秒
+  }
+  return null; // 超时未生成
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method Not Allowed" });
@@ -24,6 +39,7 @@ export default async function handler(req, res) {
   const url = `https://openapi.liblibai.cloud/api/generate/comfyui/app?AccessKey=${AccessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
 
   try {
+    // 第一步：发送生成请求
     const libResponse = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -35,11 +51,19 @@ export default async function handler(req, res) {
     const data = await libResponse.json();
     const uuid = data?.data?.generateUuid;
 
-    // 拿图像
-    const imageResponse = await fetch(`https://openapi.liblibai.cloud/api/generate/comfyui/image/${uuid}`);
-    const imageData = await imageResponse.json();
+    if (!uuid) {
+      return res.status(500).json({ error: "图像生成失败，未返回 UUID" });
+    }
 
-    return res.status(200).json({ imageUrl: imageData?.data?.url || null });
+    // 第二步：轮询等待图像生成
+    const imageUrl = await waitForImage(uuid);
+
+    if (imageUrl) {
+      return res.status(200).json({ imageUrl });
+    } else {
+      return res.status(500).json({ error: "图像生成超时，请稍后再试。" });
+    }
+
   } catch (error) {
     console.error("Liblib 请求失败：", error);
     return res.status(500).json({ error: "生成失败，请稍后再试" });
