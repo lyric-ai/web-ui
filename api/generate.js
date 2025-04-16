@@ -7,7 +7,6 @@ module.exports = async (req, res) => {
   }
 
   const { flower, jellyfish } = req.body;
-
   if (!flower || !jellyfish) {
     return res.status(400).json({ error: "缺少提示词参数" });
   }
@@ -17,7 +16,6 @@ module.exports = async (req, res) => {
   const timestamp = Date.now().toString();
   const nonce = Math.random().toString(36).substring(2, 15);
 
-  // 生成请求签名
   const uri = "/api/generate/comfyui/app";
   const stringToSign = uri + "&" + timestamp + "&" + nonce;
   const signature = crypto
@@ -46,24 +44,24 @@ module.exports = async (req, res) => {
   };
 
   try {
-    // 调用生成接口
-  
+    const response = await fetch(generateUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody)
+    });
 
     const result = await response.json();
-    console.log("生成请求返回的数据：", result); // 打印返回的数据
+    console.log("生成请求返回的数据：", result);
 
     if (result.code !== 0) {
-      console.error("生成请求失败，错误信息：", result);
       return res.status(500).json({ error: "生成失败：" + result.msg });
     }
 
     const generateUuid = result.data.generateUuid;
 
-    // 查询生成状态
+    // 查询状态
     const statusTimestamp = Date.now().toString();
     const statusNonce = Math.random().toString(36).substring(2, 15);
-
-    // 计算查询请求的签名
     const statusUri = "/api/generate/comfyui/status";
     const statusStringToSign = statusUri + "&" + statusTimestamp + "&" + statusNonce;
     const statusSignature = crypto
@@ -76,32 +74,24 @@ module.exports = async (req, res) => {
 
     const statusUrl = `https://openapi.liblibai.cloud${statusUri}?AccessKey=${accessKey}&Signature=${statusSignature}&Timestamp=${statusTimestamp}&SignatureNonce=${statusNonce}`;
 
-    // 查询生成状态
+    // 等待生成完成（可加轮询机制，这里简单查一次）
     const statusResponse = await fetch(statusUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ generateUuid }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ generateUuid })
     });
 
     const statusResult = await statusResponse.json();
-    console.log("状态查询返回的数据：", statusResult); // 打印状态查询返回的数据
+    console.log("状态查询返回的数据：", statusResult);
 
-    if (statusResult.code !== 0) {
-      console.error("状态查询失败，错误信息：", statusResult);
+    if (statusResult.code !== 0 || !statusResult.data.imageUrl) {
       return res.status(500).json({ error: "状态查询失败：" + statusResult.msg });
     }
 
-    const imageUrl = statusResult.data.imageUrl; // 假设返回的是图像的 URL
-    if (!imageUrl) {
-      return res.status(500).json({ error: "生成失败，没有图像 URL" });
-    }
-
-    return res.status(200).json({ imageUrl });
+    return res.status(200).json({ imageUrl: statusResult.data.imageUrl });
 
   } catch (error) {
-    console.error("请求失败：", error);
+    console.error("请求异常：", error);
     return res.status(500).json({ error: "请求发生错误：" + error.message });
   }
 };
