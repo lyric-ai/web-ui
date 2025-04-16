@@ -32,7 +32,10 @@ export default async function handler(req, res) {
     const timestamp = Date.now().toString();
     const nonce = Math.random().toString(36).substring(2);
     const uri = "/api/generate/comfyui/app";
+    
+    // 拼接签名字符串：uri+&+timestamp+&+nonce
     const stringToSign = `${uri}&${timestamp}&${nonce}`;
+    console.log("生成的签名字符串：", stringToSign);
 
     const crypto = await import("crypto");
     const hmac = crypto.createHmac("sha1", secretKey);
@@ -40,7 +43,10 @@ export default async function handler(req, res) {
     const signature = hmac.digest("base64")
       .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
+    console.log("生成的签名：", signature);
+
     const apiUrl = `https://openapi.liblibai.cloud${uri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
+    console.log("生成的请求 URL：", apiUrl);
 
     // 调用生成接口
     const liblibRes = await fetch(apiUrl, {
@@ -53,12 +59,12 @@ export default async function handler(req, res) {
       body: JSON.stringify(requestBody)
     });
 
-    const text = await liblibRes.text(); // 不管返回是不是 JSON，都先拿到纯文本
+    const text = await liblibRes.text();
     console.log("liblib 返回内容：", text);
 
     let result;
     try {
-      result = JSON.parse(text); // 尝试转成 JSON
+      result = JSON.parse(text);
     } catch (e) {
       return res.status(500).json({ error: "返回结果不是 JSON，原始内容：" + text });
     }
@@ -86,7 +92,7 @@ export default async function handler(req, res) {
 
     let statusResult;
     try {
-      statusResult = JSON.parse(statusText); // 尝试转成 JSON
+      statusResult = JSON.parse(statusText);
     } catch (e) {
       return res.status(500).json({ error: "状态查询返回结果不是 JSON，原始内容：" + statusText });
     }
@@ -97,7 +103,7 @@ export default async function handler(req, res) {
 
     // 获取生成图像 URL
     if (statusResult.data.generateStatus === 5) {
-      const imageUrl = statusResult.data.images[0].imageUrl; // 假设返回的是图像的 URL
+      const imageUrl = statusResult.data.images[0].imageUrl; 
       res.status(200).json({ imageUrl });
     } else if (statusResult.data.generateStatus === 6) {
       return res.status(500).json({ error: "生成任务失败：" + statusResult.data.generateMsg });
