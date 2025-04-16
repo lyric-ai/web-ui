@@ -1,60 +1,69 @@
-import fetch from 'node-fetch';
+import fetch from "node-fetch";
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: '仅支持 POST 请求' });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "仅支持 POST 请求" });
   }
 
   const { flower, jellyfish } = req.body;
 
   if (!flower || !jellyfish) {
-    return res.status(400).json({ error: '缺少提示词参数' });
+    return res.status(400).json({ error: "缺少提示词参数" });
   }
 
-  try {
-    const response = await fetch('https://openapi.liblibai.cloud/api/generate/comfyui/app', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'AccessKey': process.env.LIBLIB_ACCESS_KEY,
-        'SecretKey': process.env.LIBLIB_SECRET_KEY,
+  const ACCESS_KEY = 'NRXABtFaq2nlj-fRV4685Q';
+  const SECRET_KEY = 'VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf';
+
+  const payload = {
+    inputs: {
+      "63": { // 水母节点
+        text: jellyfish
       },
-      body: JSON.stringify({
-        inputs: {
-          "花朵提示词": flower,
-          "水母提示词": jellyfish,
-        }
-      }),
+      "65": { // 花朵节点
+        text: flower
+      }
+    }
+  };
+
+  try {
+    const response = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "AccessKey": ACCESS_KEY,
+        "SecretKey": SECRET_KEY,
+      },
+      body: JSON.stringify(payload)
     });
 
     const result = await response.json();
-    console.log("Liblib 返回：", result); // 调试信息
 
-    if (!result?.request_id) {
-      return res.status(500).json({ error: '请求生成失败', raw: result });
+    if (result.code !== 200 || !result.data?.task_id) {
+      console.error("生成失败：", result);
+      return res.status(500).json({ error: "请求生成失败", raw: result });
     }
 
-    const statusRes = await fetch('https://openapi.liblibai.cloud/api/generate/comfy/status/', {
-      method: 'POST',
+    // 获取任务状态
+    const taskId = result.data.task_id;
+    const statusResponse = await fetch(`https://openapi.liblibai.cloud/api/generate/comfy/status/?task_id=${taskId}`, {
+      method: "GET",
       headers: {
-        'Content-Type': 'application/json',
-        'AccessKey': process.env.LIBLIB_ACCESS_KEY,
-        'SecretKey': process.env.LIBLIB_SECRET_KEY,
+        "AccessKey": ACCESS_KEY,
+        "SecretKey": SECRET_KEY,
       },
-      body: JSON.stringify({ request_id: result.request_id }),
     });
 
-    const statusResult = await statusRes.json();
-    console.log("状态查询返回：", statusResult); // 调试信息
+    const statusResult = await statusResponse.json();
 
-    if (statusResult?.data?.images?.[0]?.url) {
-      return res.status(200).json({ imageUrl: statusResult.data.images[0].url });
-    } else {
-      return res.status(500).json({ error: '图像生成失败', raw: statusResult });
+    if (statusResult.code !== 200 || !statusResult.data?.image_urls?.[0]) {
+      console.error("图像获取失败：", statusResult);
+      return res.status(500).json({ error: "图像获取失败", raw: statusResult });
     }
 
-  } catch (error) {
-    console.error('生成图像失败:', error);
-    return res.status(500).json({ error: '服务端错误', message: error.message });
+    return res.status(200).json({ imageUrl: statusResult.data.image_urls[0] });
+
+  } catch (err) {
+    console.error("请求异常：", err);
+    return res.status(500).json({ error: "服务异常", detail: err });
   }
 }
