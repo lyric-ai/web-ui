@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
   const timestamp = Date.now().toString();
   const nonce = Math.random().toString(36).substring(2);
-  const uri = "/api/generate/comfy/status";
+  const uri = "/api/generate/comfyui/status";
   const stringToSign = uri + "&" + timestamp + "&" + nonce;
 
   const crypto = await import("crypto");
