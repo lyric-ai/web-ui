@@ -62,7 +62,8 @@ module.exports = async (req, res) => {
     // 查询状态
     const statusTimestamp = Date.now().toString();
     const statusNonce = Math.random().toString(36).substring(2, 15);
-    const statusUri = "/api/generate/comfyui/status"; // 保持一致，路径改为 /api/generate/comfyui/status
+    const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfy/status?AccessKey=${accessKey}&Signature=${statusSignature}&Timestamp=${statusTimestamp}&SignatureNonce=${statusNonce}`;
+ // 保持一致，路径改为 /api/generate/comfyui/status
     const statusStringToSign = statusUri + "&" + statusTimestamp + "&" + statusNonce;
     const statusSignature = crypto
       .createHmac("sha1", secretKey)
