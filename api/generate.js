@@ -70,8 +70,30 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "生成失败：" + result.msg });
     }
 
-    res.status(200).json({ generateUuid: result.data.generateUuid });
+    const generateUuid = result.data.generateUuid;
 
+    // 使用 generateUuid 查询生成图像的状态和URL
+    const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfyui/status?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}&generateUuid=${generateUuid}`;
+
+    const statusRes = await fetch(statusUrl);
+    const statusText = await statusRes.text();
+    console.log("状态查询返回内容：", statusText);
+
+    let statusResult;
+    try {
+      statusResult = JSON.parse(statusText);
+    } catch (e) {
+      return res.status(500).json({ error: "状态查询返回结果不是 JSON，原始内容：" + statusText });
+    }
+
+    if (statusResult.code !== 0) {
+      return res.status(500).json({ error: "查询状态失败：" + statusResult.msg });
+    }
+
+    // 返回生成的图像 URL
+    const imageUrl = statusResult.data.imageUrl;
+
+    res.status(200).json({ imageUrl });
   } catch (error) {
     console.error("请求失败：", error);
     res.status(500).json({ error: "请求发生错误：" + error.message });
