@@ -1,4 +1,7 @@
-export default async function handler(req, res) {
+const fetch = require("node-fetch");
+const crypto = require("crypto");
+
+module.exports = async (req, res) => {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "只支持 POST 请求" });
   }
@@ -9,6 +12,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "缺少提示词参数" });
   }
 
+  const accessKey = "NRXABtFaq2nlj-fRV4685Q"; // 从环境变量或配置文件获取
+  const secretKey = "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf"; // 从环境变量或配置文件获取
+  const timestamp = Date.now().toString();
+  const nonce = Math.random().toString(36).substring(2, 15);
+
+  // 确保 URI 路径与 API 文档匹配
+  const uri = "/api/generate/comfyui/app";
+  // 使用花卉和水母的文本生成模型
   const requestBody = {
     templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
     generateParams: {
@@ -20,99 +31,59 @@ export default async function handler(req, res) {
         class_type: "CLIPTextEncode",
         inputs: { text: flower }
       },
-      workflowUuid: "5f7cf756fd804deeac558322dc5bd813"
+      workflowUuid: "dee7984fcace4d40aa8bc99ff6a4dc36"
     }
   };
 
+  // 计算签名字符串
+  const stringToSign = uri + "&" + timestamp + "&" + nonce;
+  const signature = crypto
+    .createHmac("sha1", secretKey)
+    .update(stringToSign)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  const url = `https://openapi.liblibai.cloud${uri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
+
   try {
-    const accessKey = process.env.LIBLIB_ACCESS_KEY;
-    const secretKey = process.env.LIBLIB_SECRET_KEY;
-
-    // 创建请求 URL 和签名
-    const timestamp = Date.now().toString();
-    const nonce = Math.random().toString(36).substring(2);
-    const uri = "/api/generate/comfyui/app";
-    
-    // 拼接签名字符串：uri+&+timestamp+&+nonce
-    const stringToSign = `${uri}&${timestamp}&${nonce}`;
-    console.log("生成的签名字符串：", stringToSign);
-
-    const crypto = await import("crypto");
-    const hmac = crypto.createHmac("sha1", secretKey);
-    hmac.update(stringToSign);
-    const signature = hmac.digest("base64")
-      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-    console.log("生成的签名：", signature);
-
-    const apiUrl = `https://openapi.liblibai.cloud${uri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
-    console.log("生成的请求 URL：", apiUrl);
-
     // 调用生成接口
-    const liblibRes = await fetch(apiUrl, {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "AccessKey": accessKey,
-        "SecretKey": secretKey
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
     });
 
-    const text = await liblibRes.text();
-    console.log("liblib 返回内容：", text);
-
-    let result;
-    try {
-      result = JSON.parse(text);
-    } catch (e) {
-      return res.status(500).json({ error: "返回结果不是 JSON，原始内容：" + text });
-    }
-
+    const result = await response.json();
     if (result.code !== 0) {
       return res.status(500).json({ error: "生成失败：" + result.msg });
     }
 
-    const generateUuid = result.data.generateUuid;  // 获取生成任务 UUID
+    const generateUuid = result.data.generateUuid;
 
-    // 调用状态查询接口，检查生成状态
+    // 查询生成状态
     const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfyui/status?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
     const statusResponse = await fetch(statusUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "AccessKey": accessKey,
-        "SecretKey": secretKey
       },
-      body: JSON.stringify({ generateUuid })
+      body: JSON.stringify({ generateUuid }),
     });
 
-    const statusText = await statusResponse.text();
-    console.log("liblib 状态查询结果：", statusText);
-
-    let statusResult;
-    try {
-      statusResult = JSON.parse(statusText);
-    } catch (e) {
-      return res.status(500).json({ error: "状态查询返回结果不是 JSON，原始内容：" + statusText });
-    }
-
+    const statusResult = await statusResponse.json();
     if (statusResult.code !== 0) {
       return res.status(500).json({ error: "状态查询失败：" + statusResult.msg });
     }
 
-    // 获取生成图像 URL
-    if (statusResult.data.generateStatus === 5) {
-      const imageUrl = statusResult.data.images[0].imageUrl; 
-      res.status(200).json({ imageUrl });
-    } else if (statusResult.data.generateStatus === 6) {
-      return res.status(500).json({ error: "生成任务失败：" + statusResult.data.generateMsg });
-    } else {
-      return res.status(400).json({ error: "任务未完成，当前状态: " + statusResult.data.generateStatus });
-    }
+    const imageUrl = statusResult.data.imageUrl; // 假设返回的是图像的 URL
+    return res.status(200).json({ imageUrl });
 
   } catch (error) {
     console.error("请求失败：", error);
-    res.status(500).json({ error: "请求发生错误：" + error.message });
+    return res.status(500).json({ error: "请求发生错误：" + error.message });
   }
-}
+};
