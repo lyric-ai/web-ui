@@ -1,5 +1,3 @@
-import crypto from "crypto";
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "只支持 POST 请求" });
@@ -75,7 +73,48 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "生成失败：" + result.msg });
     }
 
-    res.status(200).json({ generateUuid: result.data.generateUuid });
+    // 获取图像资源的 UUID
+    const generateUuid = result.data.generateUuid;
+
+    // 查询生成图像的状态
+    let imageReady = false;
+    let retryCount = 0;
+    const maxRetries = 10;
+    const waitTime = 3000; // 3秒后重试
+
+    while (!imageReady && retryCount < maxRetries) {
+      const statusRes = await fetch(`https://openapi.liblibai.cloud/api/generate/comfyui/image/${generateUuid}`, {
+        method: "GET",
+        headers: {
+          "AccessKey": accessKey,
+          "SecretKey": secretKey
+        }
+      });
+
+      const statusText = await statusRes.text();
+      console.log("图像状态查询返回内容：", statusText);
+
+      try {
+        const statusResult = JSON.parse(statusText);
+        if (statusResult.code === 0 && statusResult.data) {
+          imageReady = true;  // 图像生成成功
+        }
+      } catch (e) {
+        console.log("状态查询解析失败：", e);
+      }
+
+      if (!imageReady) {
+        retryCount++;
+        console.log(`重试 ${retryCount}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, waitTime)); // 等待3秒后重试
+      }
+    }
+
+    if (imageReady) {
+      res.status(200).json({ imageUrl: `https://openapi.liblibai.cloud/api/generate/comfyui/image/${generateUuid}` });
+    } else {
+      res.status(500).json({ error: "图像生成超时，未能成功获取图像" });
+    }
 
   } catch (error) {
     console.error("请求失败：", error);
