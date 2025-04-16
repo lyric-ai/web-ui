@@ -1,90 +1,58 @@
-async function generateImage() {
-  const flower = document.getElementById("flowerInput").value.trim();
-  const jellyfish = document.getElementById("jellyfishInput").value.trim();
-
-  if (!flower || !jellyfish) {
-    alert("请输入花和水母的提示词！");
-    return;
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "只支持 POST 请求" });
   }
 
-  document.getElementById("loading").style.display = "flex";
-  document.getElementById("resultImage").style.display = "none";
+  const { flower, jellyfish } = req.body;
+
+  if (!flower || !jellyfish) {
+    return res.status(400).json({ error: "缺少提示词参数" });
+  }
 
   const requestBody = {
     templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
     generateParams: {
       "63": {
         class_type: "CLIPTextEncode",
-        inputs: {
-          text: jellyfish
-        }
+        inputs: { text: jellyfish }
       },
       "65": {
         class_type: "CLIPTextEncode",
-        inputs: {
-          text: flower
-        }
+        inputs: { text: flower }
       },
       workflowUuid: "5f7cf756fd804deeac558322dc5bd813"
     }
   };
 
-  // 发送请求到API服务器
-  const response = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "AccessKey": "NRXABtFaq2nlj-fRV4685Q",
-      "SecretKey": "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf"
-    },
-    body: JSON.stringify(requestBody)
-  });
-
-  const result = await response.json();
-  if (result.code !== 0) {
-    alert("生成失败：" + result.msg);
-    document.getElementById("loading").style.display = "none";
-    return;
-  }
-
-  const generateUuid = result.data.generateUuid;
-
-  let tries = 0;
-  const maxRetries = 5; // 设置最多重试5次
-  const intervalTime = 5000; // 每次重试等待5秒
-
-  async function checkGenerationStatus() {
-    tries++;
-    if (tries > maxRetries) {
-      alert("生成任务超时，请稍后再试。");
-      document.getElementById("loading").style.display = "none";
-      return;
-    }
-
-    // 发送请求获取生成状态
-    const statusResponse = await fetch("/api/generate/status", {
+  try {
+    const liblibRes = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "AccessKey": "NRXABtFaq2nlj-fRV4685Q",
+        "SecretKey": "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf"
       },
-      body: JSON.stringify({ generateUuid })
+      body: JSON.stringify(requestBody)
     });
 
-    const statusResult = await statusResponse.json();
-    if (statusResult.code === 0 && statusResult.data.generateStatus === 5) {
-      // 如果生成完成，显示图片
-      const imgUrl = statusResult.data.images[0].imageUrl;
-      const img = document.getElementById("resultImage");
-      img.src = imgUrl;
-      img.style.display = "block";
-      img.style.opacity = 0;
-      setTimeout(() => img.style.opacity = 1, 50);
-      document.getElementById("loading").style.display = "none";
-    } else {
-      // 如果生成未完成，等待5秒后重试
-      setTimeout(checkGenerationStatus, intervalTime);
-    }
-  }
+    const text = await liblibRes.text(); // 不管返回是不是 JSON，都先拿到纯文本
+    console.log("liblib 返回内容：", text);
 
-  checkGenerationStatus();
+    let result;
+    try {
+      result = JSON.parse(text); // 尝试转成 JSON
+    } catch (e) {
+      return res.status(500).json({ error: "返回结果不是 JSON，原始内容：" + text });
+    }
+
+    if (result.code !== 0) {
+      return res.status(500).json({ error: "生成失败：" + result.msg });
+    }
+
+    res.status(200).json({ generateUuid: result.data.generateUuid });
+
+  } catch (error) {
+    console.error("请求失败：", error);
+    res.status(500).json({ error: "请求发生错误：" + error.message });
+  }
 }
