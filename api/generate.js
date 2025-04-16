@@ -12,8 +12,8 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: "缺少提示词参数" });
   }
 
-  const accessKey = "NRXABtFaq2nlj-fRV4685Q"; // 从环境变量或配置文件获取
-  const secretKey = "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf"; // 从环境变量或配置文件获取
+  const accessKey = "NRXABtFaq2nlj-fRV4685Q";
+  const secretKey = "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf";
   const timestamp = Date.now().toString();
   const nonce = Math.random().toString(36).substring(2, 15);
 
@@ -29,7 +29,6 @@ module.exports = async (req, res) => {
     .replace(/=+$/, "");
 
   const generateUrl = `https://openapi.liblibai.cloud${uri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
-  console.log("生成签名的 URL：", generateUrl);
 
   const requestBody = {
     templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
@@ -64,10 +63,45 @@ module.exports = async (req, res) => {
       return res.status(500).json({ error: "生成失败：" + result.msg });
     }
 
-    // 提取图像 URL
-    const imageUrl = result.data.images && result.data.images[0] ? result.data.images[0].imageUrl : null;
+    const generateUuid = result.data.generateUuid;
+
+    // 查询生成状态
+    const statusTimestamp = Date.now().toString();
+    const statusNonce = Math.random().toString(36).substring(2, 15);
+
+    // 计算查询请求的签名
+    const statusUri = "/api/generate/comfyui/status";
+    const statusStringToSign = statusUri + "&" + statusTimestamp + "&" + statusNonce;
+    const statusSignature = crypto
+      .createHmac("sha1", secretKey)
+      .update(statusStringToSign)
+      .digest("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    const statusUrl = `https://openapi.liblibai.cloud${statusUri}?AccessKey=${accessKey}&Signature=${statusSignature}&Timestamp=${statusTimestamp}&SignatureNonce=${statusNonce}`;
+
+    // 查询生成状态
+    const statusResponse = await fetch(statusUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ generateUuid }),
+    });
+
+    const statusResult = await statusResponse.json();
+    console.log("状态查询返回的数据：", statusResult); // 打印状态查询返回的数据
+
+    if (statusResult.code !== 0) {
+      console.error("状态查询失败，错误信息：", statusResult);
+      return res.status(500).json({ error: "状态查询失败：" + statusResult.msg });
+    }
+
+    const imageUrl = statusResult.data.imageUrl; // 假设返回的是图像的 URL
     if (!imageUrl) {
-      return res.status(500).json({ error: "无法获取图像 URL" });
+      return res.status(500).json({ error: "生成失败，没有图像 URL" });
     }
 
     return res.status(200).json({ imageUrl });
