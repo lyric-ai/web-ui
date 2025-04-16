@@ -45,4 +45,20 @@ async function generateImage() {
     console.error("生成请求失败：", error);
     alert("生成请求失败，请稍后再试！");
   }
+  const response = await fetch(generateUrl, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(requestBody),
+});
+
+const result = await response.json();
+console.log("生成请求返回的数据：", result);  // 打印返回的数据
+
+if (result.code !== 0) {
+  console.error("生成请求失败，错误信息：", result);
+  return res.status(500).json({ error: "生成失败：" + result.msg });
+}
+
 }
