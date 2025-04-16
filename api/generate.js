@@ -8,7 +8,7 @@ module.exports = async (req, res) => {
 
   const { flower, jellyfish } = req.body;
   if (!flower || !jellyfish) {
-    return res.status(400).json({ error: "缺少提示词参数" });
+    return res.status(400).json({ error: "缺少提示词" });
   }
 
   const accessKey = "NRXABtFaq2nlj-fRV4685Q";
@@ -16,9 +16,8 @@ module.exports = async (req, res) => {
   const timestamp = Date.now().toString();
   const nonce = Math.random().toString(36).substring(2, 15);
 
-  // 生成请求签名
-  const uri = "/api/generate/comfyui/app";
-  const stringToSign = uri + "&" + timestamp + "&" + nonce;
+  const generateUri = "/api/generate/comfyui";
+  const stringToSign = generateUri + "&" + timestamp + "&" + nonce;
   const signature = crypto
     .createHmac("sha1", secretKey)
     .update(stringToSign)
@@ -27,80 +26,47 @@ module.exports = async (req, res) => {
     .replace(/\//g, "_")
     .replace(/=+$/, "");
 
-  const generateUrl = `https://openapi.liblibai.cloud${uri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
-
-  const requestBody = {
-    templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
-    generateParams: {
-      "63": {
-        class_type: "CLIPTextEncode",
-        inputs: { text: jellyfish }
-      },
-      "65": {
-        class_type: "CLIPTextEncode",
-        inputs: { text: flower }
-      },
-      workflowUuid: "5f7cf756fd804deeac558322dc5bd813"
-    }
-  };
+  const generateUrl = `https://openapi.liblibai.cloud${generateUri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
 
   try {
-    // 发送生成请求
-    const response = await fetch(generateUrl, {
+    // 发起生成请求，获取 UUID
+    const generateRes = await fetch(generateUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify({
+        prompt: `${flower}, ${jellyfish}`,
+        model: "你的模型ID", // ⚠️ 这里记得填你在Liblib上的模型ID
+        params: {} // 根据需要添加你的参数
+      }),
     });
 
-    const result = await response.json();
-    console.log("生成请求返回的数据：", result);
+    const generateData = await generateRes.json();
+    console.log("生成请求返回的数据：", generateData);
 
-    if (result.code !== 0) {
-      return res.status(500).json({ error: "生成失败：" + result.msg });
+    if (generateData.code !== 0 || !generateData.data.generateUuid) {
+      return res.status(500).json({ error: "生成请求失败：" + generateData.msg });
     }
 
-    const generateUuid = result.data.generateUuid;
+    const generateUuid = generateData.data.generateUuid;
 
-    // 查询生成状态并轮询
-    let statusResult;
-    do {
-      const statusTimestamp = Date.now().toString();
-      const statusNonce = Math.random().toString(36).substring(2, 15);
-      const statusUri = "/api/generate/comfyui/status";
-      const statusStringToSign = statusUri + "&" + statusTimestamp + "&" + statusNonce;
-      const statusSignature = crypto
-        .createHmac("sha1", secretKey)
-        .update(statusStringToSign)
-        .digest("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
+    // ➕ 查询状态（调用 status API）
+    const statusRes = await fetch(`${req.headers.host ? `https://${req.headers.host}` : ''}/api/generate/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ generateUuid }),
+    });
 
-      const statusUrl = `https://openapi.liblibai.cloud${statusUri}?AccessKey=${accessKey}&Signature=${statusSignature}&Timestamp=${statusTimestamp}&SignatureNonce=${statusNonce}`;
+    const statusData = await statusRes.json();
+    console.log("状态查询返回的数据：", statusData);
 
-      const statusResponse = await fetch(statusUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generateUuid })
-      });
+    if (statusData.error || !statusData.imageUrl) {
+      return res.status(500).json({ error: "状态查询失败" });
+    }
 
-      statusResult = await statusResponse.json();
-      console.log("状态查询返回的数据：", statusResult);
+    return res.status(200).json({ imageUrl: statusData.imageUrl });
 
-      if (statusResult.code !== 0 || !statusResult.data.imageUrl) {
-        return res.status(500).json({ error: "状态查询失败：" + statusResult.msg });
-      }
-
-      // 如果生成任务还未完成，等待 2 秒再查询一次
-      if (statusResult.data.generateStatus !== 5) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    } while (statusResult.data.generateStatus !== 5);
-
-    return res.status(200).json({ imageUrl: statusResult.data.imageUrl });
-
-  } catch (error) {
-    console.error("请求异常：", error);
-    return res.status(500).json({ error: "请求发生错误：" + error.message });
+  } catch (err) {
+    console.error("出错啦：", err);
+    return res.status(500).json({ error: "服务器错误：" + err.message });
   }
 };
