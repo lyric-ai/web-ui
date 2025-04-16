@@ -33,7 +33,13 @@ export default async function handler(req, res) {
       body: JSON.stringify({ generateUuid })
     });
 
-    const data = await response.json();
+    // 输出响应的原始内容以便调试
+    const responseBody = await response.text();
+    console.log("Response from Liblib API:", responseBody);
+
+    // 尝试解析 JSON 数据
+    const data = JSON.parse(responseBody);
+    
     if (data.code !== 0) {
       return res.status(500).json({ error: 'Error from Liblib API', message: data.msg });
     }
