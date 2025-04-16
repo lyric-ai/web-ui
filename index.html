@@ -1,81 +1,38 @@
-<!DOCTYPE html>
-<html lang="zh">
-<head>
-  <meta charset="UTF-8">
-  <title>梦幻水母生成器</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 2em;
+<script>
+  async function generateImage() {
+    const flower = document.getElementById("flowerInput").value.trim();
+    const jellyfish = document.getElementById("jellyfishInput").value.trim();
+
+    if (!flower || !jellyfish) {
+      alert("请填写完整的提示词！");
+      return;
     }
-    #loading {
-      display: none;
-      font-size: 1.2em;
-      margin-top: 1em;
-    }
-    img {
-      margin-top: 1em;
-      max-width: 80%;
-      border-radius: 10px;
-      box-shadow: 0 0 10px #ccc;
-    }
-  </style>
-</head>
-<body>
-  <h1>梦幻水母生成器</h1>
 
-  <p>
-    花朵情绪提示词：<input id="flowerInput" placeholder="例如：温柔、热烈的玫瑰">
-  </p>
-  <p>
-    水母情绪提示词：<input id="jellyfishInput" placeholder="例如：梦幻、宁静的水母">
-  </p>
+    document.getElementById("loading").style.display = "flex";
+    document.getElementById("resultImage").style.display = "none";
 
-  <button onclick="generateImage()">点击生成图像</button>
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flower, jellyfish })
+      });
 
-  <div id="loading">生成中，请稍候...</div>
+      const result = await response.json();
+      document.getElementById("loading").style.display = "none";
 
-  <img id="resultImage" style="display: none;" />
-
-  <script>
-    async function generateImage() {
-      const flower = document.getElementById("flowerInput").value.trim();
-      const jellyfish = document.getElementById("jellyfishInput").value.trim();
-
-      if (!flower || !jellyfish) {
-        alert("请填写完整的提示词！");
-        return;
+      if (result.error) {
+        console.error("生成失败：", result.error);
+        alert("生成失败，请重试！");
+      } else {
+        const image = document.getElementById("resultImage");
+        image.src = result.imageUrl;
+        image.style.display = "block";
       }
-
-      document.getElementById("loading").style.display = "block";
-      document.getElementById("resultImage").style.display = "none";
-
-      try {
-        const response = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ flower, jellyfish })
-        });
-
-        const result = await response.json();
-        document.getElementById("loading").style.display = "none";
-
-        if (result.error) {
-          console.error("生成失败：", result.error);
-          alert("生成失败，请重试！");
-        } else {
-          const image = document.getElementById("resultImage");
-          image.src = result.imageUrl;
-          image.style.display = "block";
-        }
-
-      } catch (error) {
-        document.getElementById("loading").style.display = "none";
-        console.error("生成请求失败：", error);
-        alert("生成请求失败，请稍后再试！");
-      }
+    } catch (error) {
+      document.getElementById("loading").style.display = "none";
+      console.error("生成请求失败：", error);
+      alert("生成请求失败，请稍后再试！");
     }
-  </script>
-</body>
-</html>
+  }
+</script>
