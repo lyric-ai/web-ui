@@ -1,5 +1,3 @@
-import fetch from "node-fetch";
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "仅支持 POST 请求" });
@@ -16,22 +14,19 @@ export default async function handler(req, res) {
 
   const payload = {
     inputs: {
-      "63": { // 水母节点
-        text: jellyfish
-      },
-      "65": { // 花朵节点
-        text: flower
-      }
+      "63": { text: jellyfish },
+      "65": { text: flower }
     }
   };
 
   try {
+    // 使用 Vercel 自带的 fetch
     const response = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "AccessKey": ACCESS_KEY,
-        "SecretKey": SECRET_KEY,
+        "SecretKey": SECRET_KEY
       },
       body: JSON.stringify(payload)
     });
@@ -43,14 +38,14 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "请求生成失败", raw: result });
     }
 
-    // 获取任务状态
     const taskId = result.data.task_id;
+
     const statusResponse = await fetch(`https://openapi.liblibai.cloud/api/generate/comfy/status/?task_id=${taskId}`, {
       method: "GET",
       headers: {
         "AccessKey": ACCESS_KEY,
-        "SecretKey": SECRET_KEY,
-      },
+        "SecretKey": SECRET_KEY
+      }
     });
 
     const statusResult = await statusResponse.json();
@@ -64,6 +59,6 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error("请求异常：", err);
-    return res.status(500).json({ error: "服务异常", detail: err });
+    return res.status(500).json({ error: "服务异常", detail: err.message });
   }
 }
