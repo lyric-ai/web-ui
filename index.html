@@ -49,8 +49,13 @@
       transition: background 0.3s;
     }
 
-    button:hover {
+    button:hover:enabled {
       background: #357ABD;
+    }
+
+    button:disabled {
+      background: #a0c4eb;
+      cursor: not-allowed;
     }
 
     #loading {
@@ -90,9 +95,9 @@
 </head>
 <body>
   <h2>输入你喜欢的花与水母，生成梦幻图像</h2>
-  <input type="text" id="flowerInput" placeholder="你喜欢的花，如：A single peony flower">
-  <input type="text" id="jellyfishInput" placeholder="你喜欢的水母，如：A jellyfish">
-  <button onclick="generateImage()">开始生成</button>
+  <input type="text" id="flowerInput" placeholder="你喜欢的花，如：A single peony flower" autocomplete="off">
+  <input type="text" id="jellyfishInput" placeholder="你喜欢的水母，如：A jellyfish" autocomplete="off">
+  <button id="generateBtn" onclick="generateImage()">开始生成</button>
 
   <div id="loading" style="display:none;">
     <div class="spinner"></div>
@@ -101,7 +106,6 @@
 
   <img id="resultImage" src="" alt="生成结果图像">
 
-  <!-- 引入外部 JS 文件 -->
   <script src="main.js"></script>
 </body>
 </html>
