@@ -42,10 +42,7 @@ export default async function handler(req, res) {
 
     const apiUrl = `https://openapi.liblibai.cloud${uri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
 
-    // 打印调试信息
-    console.log("生成请求 URL：", apiUrl);
-    console.log("生成签名：", signature);
-
+    // 调用生成接口
     const liblibRes = await fetch(apiUrl, {
       method: "POST",
       headers: {
@@ -70,7 +67,36 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "生成失败：" + result.msg });
     }
 
-    res.status(200).json({ generateUuid: result.data.generateUuid });
+    const generateUuid = result.data.generateUuid;
+
+    // 调用状态查询接口，检查生成状态
+    const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfyui/status?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
+    const statusResponse = await fetch(statusUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "AccessKey": accessKey,
+        "SecretKey": secretKey
+      },
+      body: JSON.stringify({ generateUuid })
+    });
+
+    const statusText = await statusResponse.text();
+    console.log("liblib 状态查询结果：", statusText);
+
+    let statusResult;
+    try {
+      statusResult = JSON.parse(statusText); // 尝试转成 JSON
+    } catch (e) {
+      return res.status(500).json({ error: "状态查询返回结果不是 JSON，原始内容：" + statusText });
+    }
+
+    if (statusResult.code !== 0) {
+      return res.status(500).json({ error: "状态查询失败：" + statusResult.msg });
+    }
+
+    const imageUrl = statusResult.data.imageUrl; // 假设返回的是图像的 URL
+    res.status(200).json({ imageUrl });
 
   } catch (error) {
     console.error("请求失败：", error);
