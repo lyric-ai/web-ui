@@ -1,111 +1,110 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>花与水母图像生成器</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Outfit', sans-serif;
-      background: #f0f4f8;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-    }
-
-    h2 {
-      margin-bottom: 20px;
-      color: #333;
-    }
-
-    input {
-      padding: 12px 16px;
-      font-size: 16px;
-      width: 300px;
-      margin-bottom: 10px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      outline: none;
-      transition: all 0.3s ease;
-    }
-
-    input:focus {
-      border-color: #4a90e2;
-      box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
-    }
-
-    button {
-      margin-top: 15px;
-      padding: 10px 20px;
-      background: #4a90e2;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-
-    button:hover:enabled {
-      background: #357ABD;
-    }
-
-    button:disabled {
-      background: #a0c4eb;
-      cursor: not-allowed;
-    }
-
-    #loading {
-      margin-top: 20px;
-      font-size: 16px;
-      color: #555;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .spinner {
-      width: 18px;
-      height: 18px;
-      border: 3px solid #ccc;
-      border-top: 3px solid #4a90e2;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    #resultImage {
-      margin-top: 30px;
-      max-width: 90%;
-      max-height: 500px;
-      display: none;
-      border-radius: 16px;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-      transition: opacity 0.5s ease;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>生成图像</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1-crypto-js.min.js"></script>
 </head>
 <body>
-  <h2>输入你喜欢的花与水母，生成梦幻图像</h2>
-  <input type="text" id="flowerInput" placeholder="你喜欢的花，如：A single peony flower" autocomplete="off">
-  <input type="text" id="jellyfishInput" placeholder="你喜欢的水母，如：A jellyfish" autocomplete="off">
-  <button id="generateBtn" onclick="generateImage()">开始生成</button>
+  <h1>生成图像</h1>
+  
+  <input type="text" id="flowerInput" placeholder="请输入花朵提示词">
+  <input type="text" id="jellyfishInput" placeholder="请输入水母提示词">
+  
+  <button onclick="generateImage()">生成图像</button>
+  
+  <div id="loading" style="display: none;">加载中...</div>
+  <img id="resultImage" style="display: none;" alt="生成的图像" />
 
-  <div id="loading" style="display:none;">
-    <div class="spinner"></div>
-    <span>生成中，请稍候...</span>
-  </div>
+  <script>
+    async function generateImage() {
+      const flower = document.getElementById("flowerInput").value.trim();
+      const jellyfish = document.getElementById("jellyfishInput").value.trim();
 
-  <img id="resultImage" src="" alt="生成结果图像">
+      if (!flower || !jellyfish) {
+        alert("请填写完整的提示词！");
+        return;
+      }
 
-  <script src="main.js"></script>
+      // 显示加载动画
+      document.getElementById("loading").style.display = "flex";
+      document.getElementById("resultImage").style.display = "none";
+
+      try {
+        // 获取当前时间戳和随机字符串
+        const timestamp = Date.now();
+        const signatureNonce = Math.random().toString(36).substring(2, 15);
+
+        // 拼接原文用于生成签名
+        const apiUri = "/api/genImg";
+        const rawString = `${apiUri}&${timestamp}&${signatureNonce}`;
+
+        // 使用 HMAC-SHA1 生成签名
+        const signature = CryptoJS.HmacSHA1(rawString, 'your-secret-key').toString(CryptoJS.enc.Base64);
+
+        // 发起请求
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "AccessKey": "your-access-key",
+            "Signature": signature,
+            "Timestamp": timestamp,
+            "SignatureNonce": signatureNonce
+          },
+          body: JSON.stringify({ flower, jellyfish })
+        });
+
+        const result = await response.json();
+        document.getElementById("loading").style.display = "none"; // 隐藏加载动画
+
+        if (result.error) {
+          console.error("生成失败：", result.error);
+          alert("生成失败，请重试！");
+        } else {
+          // 获取生成图像的 UUID
+          const generateUuid = result.generateUuid;
+
+          // 查询图像状态直到成功
+          let imageReady = false;
+          let retryCount = 0;
+          const maxRetries = 10;
+          const waitTime = 3000; // 每3秒检查一次
+
+          while (!imageReady && retryCount < maxRetries) {
+            const imageResponse = await fetch(`/api/generate-image?generateUuid=${generateUuid}`);
+            const imageStatus = await imageResponse.json();
+
+            if (imageStatus.error) {
+              console.error("获取图像失败：", imageStatus.error);
+              alert("获取图像失败，请重试！");
+              break;
+            } else if (imageStatus.imageUrl) {
+              // 如果图像生成成功，显示图像
+              const image = document.getElementById("resultImage");
+              image.src = imageStatus.imageUrl;
+              image.style.display = "block"; // 显示图像
+              imageReady = true;
+            } else {
+              // 如果图像未准备好，继续重试
+              retryCount++;
+              console.log(`重试 ${retryCount}/${maxRetries}`);
+              await new Promise(resolve => setTimeout(resolve, waitTime)); // 等待3秒
+            }
+          }
+
+          // 如果重试次数超过最大次数，提示失败
+          if (!imageReady) {
+            alert("图像生成超时，请稍后再试！");
+          }
+        }
+      } catch (error) {
+        document.getElementById("loading").style.display = "none";
+        console.error("生成请求失败：", error);
+        alert("生成请求失败，请稍后再试！");
+      }
+    }
+  </script>
 </body>
 </html>
