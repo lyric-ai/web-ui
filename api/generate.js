@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     const timestamp = Date.now().toString();
     const nonce = Math.random().toString(36).substring(2);
     const uri = "/api/generate/comfyui/app";
-    const stringToSign = uri + "&" + timestamp + "&" + nonce;
+    const stringToSign = `${uri}&${timestamp}&${nonce}`;
 
     const crypto = await import("crypto");
     const hmac = crypto.createHmac("sha1", secretKey);
