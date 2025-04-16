@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "只支持 POST 请求" });
@@ -31,14 +33,16 @@ export default async function handler(req, res) {
     // 创建请求 URL 和签名
     const timestamp = Date.now().toString();
     const nonce = Math.random().toString(36).substring(2);
-    const uri = "/api/generate/comfyui/app";
-    const stringToSign = uri + "&" + timestamp + "&" + nonce;
+    const uri = "/api/generate/comfyui/app";  // 请求的 URI 地址
+    const stringToSign = `${uri}&${timestamp}&${nonce}`;  // 拼接待签名字符串
 
-    const crypto = await import("crypto");
+    // 使用 HMAC-SHA1 算法加密
     const hmac = crypto.createHmac("sha1", secretKey);
     hmac.update(stringToSign);
     const signature = hmac.digest("base64")
-      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      .replace(/\+/g, "-")  // URL安全Base64替换
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");  // 移除Base64填充字符
 
     const apiUrl = `https://openapi.liblibai.cloud${uri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
 
@@ -46,6 +50,7 @@ export default async function handler(req, res) {
     console.log("生成请求 URL：", apiUrl);
     console.log("生成签名：", signature);
 
+    // 发起请求
     const liblibRes = await fetch(apiUrl, {
       method: "POST",
       headers: {
@@ -70,30 +75,8 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "生成失败：" + result.msg });
     }
 
-    const generateUuid = result.data.generateUuid;
+    res.status(200).json({ generateUuid: result.data.generateUuid });
 
-    // 使用 generateUuid 查询生成图像的状态和URL
-    const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfyui/status?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}&generateUuid=${generateUuid}`;
-
-    const statusRes = await fetch(statusUrl);
-    const statusText = await statusRes.text();
-    console.log("状态查询返回内容：", statusText);
-
-    let statusResult;
-    try {
-      statusResult = JSON.parse(statusText);
-    } catch (e) {
-      return res.status(500).json({ error: "状态查询返回结果不是 JSON，原始内容：" + statusText });
-    }
-
-    if (statusResult.code !== 0) {
-      return res.status(500).json({ error: "查询状态失败：" + statusResult.msg });
-    }
-
-    // 返回生成的图像 URL
-    const imageUrl = statusResult.data.imageUrl;
-
-    res.status(200).json({ imageUrl });
   } catch (error) {
     console.error("请求失败：", error);
     res.status(500).json({ error: "请求发生错误：" + error.message });
