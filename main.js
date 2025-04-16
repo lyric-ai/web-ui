@@ -20,12 +20,15 @@ async function generateImage() {
     const result = await response.json();
     document.getElementById("loading").style.display = "none";
 
-    if (result.error) {
-      console.error("生成失败：", result.error);
-      alert("生成失败，请重试！");
-    } else {
-      // 获取生成的图像 UUID
-      const generateUuid = result.generateUuid;
+  if (result.error) {
+  console.error("生成失败：", result.error);
+  alert("生成失败，请重试！");
+} else {
+  const image = document.getElementById("resultImage");
+  image.src = result.imageUrl;  // 使用返回的图像 URL
+  image.style.display = "block";
+}
+
 
       // 根据 UUID 请求生成的图像
       const imageResponse = await fetch(`/api/generate-image?generateUuid=${generateUuid}`);
