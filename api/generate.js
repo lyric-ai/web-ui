@@ -16,6 +16,7 @@ module.exports = async (req, res) => {
   const timestamp = Date.now().toString();
   const nonce = Math.random().toString(36).substring(2, 15);
 
+  // 生成请求签名
   const uri = "/api/generate/comfyui/app";
   const stringToSign = uri + "&" + timestamp + "&" + nonce;
   const signature = crypto
@@ -44,6 +45,7 @@ module.exports = async (req, res) => {
   };
 
   try {
+    // 发送生成请求
     const response = await fetch(generateUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -59,34 +61,41 @@ module.exports = async (req, res) => {
 
     const generateUuid = result.data.generateUuid;
 
-    // 查询状态
-    const statusTimestamp = Date.now().toString();
-    const statusNonce = Math.random().toString(36).substring(2, 15);
-    const statusUri = "/api/generate/comfyui/status";
-    const statusStringToSign = statusUri + "&" + statusTimestamp + "&" + statusNonce;
-    const statusSignature = crypto
-      .createHmac("sha1", secretKey)
-      .update(statusStringToSign)
-      .digest("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
+    // 查询生成状态并轮询
+    let statusResult;
+    do {
+      const statusTimestamp = Date.now().toString();
+      const statusNonce = Math.random().toString(36).substring(2, 15);
+      const statusUri = "/api/generate/comfyui/status";
+      const statusStringToSign = statusUri + "&" + statusTimestamp + "&" + statusNonce;
+      const statusSignature = crypto
+        .createHmac("sha1", secretKey)
+        .update(statusStringToSign)
+        .digest("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
 
-    const statusUrl = `https://openapi.liblibai.cloud${statusUri}?AccessKey=${accessKey}&Signature=${statusSignature}&Timestamp=${statusTimestamp}&SignatureNonce=${statusNonce}`;
+      const statusUrl = `https://openapi.liblibai.cloud${statusUri}?AccessKey=${accessKey}&Signature=${statusSignature}&Timestamp=${statusTimestamp}&SignatureNonce=${statusNonce}`;
 
-    // 等待生成完成（可加轮询机制，这里简单查一次）
-    const statusResponse = await fetch(statusUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ generateUuid })
-    });
+      const statusResponse = await fetch(statusUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generateUuid })
+      });
 
-    const statusResult = await statusResponse.json();
-    console.log("状态查询返回的数据：", statusResult);
+      statusResult = await statusResponse.json();
+      console.log("状态查询返回的数据：", statusResult);
 
-    if (statusResult.code !== 0 || !statusResult.data.imageUrl) {
-      return res.status(500).json({ error: "状态查询失败：" + statusResult.msg });
-    }
+      if (statusResult.code !== 0 || !statusResult.data.imageUrl) {
+        return res.status(500).json({ error: "状态查询失败：" + statusResult.msg });
+      }
+
+      // 如果生成任务还未完成，等待 2 秒再查询一次
+      if (statusResult.data.generateStatus !== 5) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    } while (statusResult.data.generateStatus !== 5);
 
     return res.status(200).json({ imageUrl: statusResult.data.imageUrl });
 
