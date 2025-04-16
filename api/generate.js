@@ -1,70 +1,85 @@
-const fetch = require('node-fetch'); // 引入 fetch 库用于发送请求
-const crypto = require('crypto');    // 用于生成 HMAC 签名
+async function generateImage() {
+  const flower = document.getElementById("flowerInput").value.trim();
+  const jellyfish = document.getElementById("jellyfishInput").value.trim();
 
-module.exports = async (req, res) => {
-  // 只允许 POST 请求
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+  if (!flower || !jellyfish) {
+    alert("请输入花和水母的提示词！");
+    return;
   }
 
-  const accessKey = "NRXABtFaq2nlj-fRV4685Q";
-  const secretKey = "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf";
+  document.getElementById("loading").style.display = "flex";
+  document.getElementById("resultImage").style.display = "none";
 
-  // 从请求体中获取提示词（prompt）
-  const { prompt } = req.body;
-  if (!prompt) {
-    return res.status(400).json({ error: 'Prompt is required' });
-  }
-
-  // 生成请求所需的签名
-  const timestamp = Date.now().toString();
-  const nonce = Math.random().toString(36).substring(2, 15);
-  const uri = "/api/generate/comfyui/app";
-  const stringToSign = uri + "&" + timestamp + "&" + nonce;
-
-  const signature = crypto.createHmac('sha1', secretKey)
-    .update(stringToSign)
-    .digest('base64')
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-  // 请求体
-  const body = {
+  const requestBody = {
     templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
     generateParams: {
-      "65": {
-        "class_type": "CLIPTextEncode",
-        "inputs": {
-          "text": prompt
+      "63": {
+        class_type: "CLIPTextEncode",
+        inputs: {
+          text: jellyfish
         }
       },
-      "workflowUuid": "dee7984fcace4d40aa8bc99ff6a4dc36"
+      "65": {
+        class_type: "CLIPTextEncode",
+        inputs: {
+          text: flower
+        }
+      },
+      workflowUuid: "5f7cf756fd804deeac558322dc5bd813"
     }
   };
 
-  // 构建请求的 URL
-  const url = `https://openapi.liblibai.cloud/api/generate/comfyui/app?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
+  const response = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "AccessKey": "NRXABtFaq2nlj-fRV4685Q",
+      "SecretKey": "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf"
+    },
+    body: JSON.stringify(requestBody)
+  });
 
-  try {
-    // 向 Liblib AI 发送 POST 请求
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+  const result = await response.json();
+  if (result.code !== 0) {
+    alert("生成失败：" + result.msg);
+    document.getElementById("loading").style.display = "none";
+    return;
+  }
+
+  const generateUuid = result.data.generateUuid;
+  checkStatus(generateUuid);
+}
+
+async function checkStatus(generateUuid) {
+  let tries = 0;
+  const interval = setInterval(async () => {
+    tries++;
+    const res = await fetch("https://openapi.liblibai.cloud/api/generate/comfy/status", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "AccessKey": "NRXABtFaq2nlj-fRV4685Q",
+        "SecretKey": "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf"
+      },
+      body: JSON.stringify({ generateUuid })
     });
 
-    const data = await response.json();
-
-    // 如果请求失败，返回错误信息
-    if (data.code !== 0) {
-      return res.status(400).json({ error: "生成失败: " + data.msg });
+    const result = await res.json();
+    if (result.code === 0 && result.data.generateStatus === 5) {
+      clearInterval(interval);
+      const imgUrl = result.data.images[0].imageUrl;
+      const img = document.getElementById("resultImage");
+      img.src = imgUrl;
+      img.style.display = "block";
+      img.style.opacity = 0;
+      setTimeout(() => img.style.opacity = 1, 50);
+      document.getElementById("loading").style.display = "none";
     }
 
-    // 获取生成的 UUID
-    const generateUuid = data.data.generateUuid;
-    return res.status(200).json({ generateUuid });
-  } catch (error) {
-    // 捕获错误并返回 500 错误
-    console.error(error); // 打印错误日志
-    return res.status(500).json({ error: "请求失败，请稍后再试" });
-  }
-};
+    if (tries >= 20) {
+      clearInterval(interval);
+      alert("生成超时，请稍后再试。");
+      document.getElementById("loading").style.display = "none";
+    }
+  }, 3000);
+}
