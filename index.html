@@ -1,38 +1,118 @@
-<script>
-  async function generateImage() {
-    const flower = document.getElementById("flowerInput").value.trim();
-    const jellyfish = document.getElementById("jellyfishInput").value.trim();
-
-    if (!flower || !jellyfish) {
-      alert("请填写完整的提示词！");
-      return;
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Liblib ComfyUI 图像生成器</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 2rem;
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      color: #333;
+      text-align: center;
     }
+    h1 {
+      color: #2563eb;
+    }
+    .input-group {
+      margin-bottom: 1rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: bold;
+    }
+    input {
+      padding: 0.5rem;
+      width: 300px;
+      max-width: 90%;
+      font-size: 1rem;
+      border-radius: 0.375rem;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 0.6rem 1.2rem;
+      font-size: 1rem;
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+    button:hover {
+      background-color: #2563eb;
+    }
+    #loading {
+      margin-top: 1.5rem;
+      display: none;
+    }
+    #resultImage {
+      margin-top: 2rem;
+      display: none;
+      max-width: 80%;
+      border-radius: 1rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <h1>🌈 ComfyUI 图像生成器</h1>
 
-    document.getElementById("loading").style.display = "flex";
-    document.getElementById("resultImage").style.display = "none";
+  <div class="input-group">
+    <label for="flowerInput">🌸 花朵提示词（flower）</label>
+    <input type="text" id="flowerInput" placeholder="如 dream, glow, fantasy..." />
+  </div>
 
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ flower, jellyfish })
-      });
+  <div class="input-group">
+    <label for="jellyfishInput">🌊 水母提示词（jellyfish）</label>
+    <input type="text" id="jellyfishInput" placeholder="如 light, sky, cosmic..." />
+  </div>
 
-      const result = await response.json();
-      document.getElementById("loading").style.display = "none";
+  <button onclick="generateImage()">✨ 生成图像</button>
 
-      if (result.error) {
-        console.error("生成失败：", result.error);
-        alert("生成失败，请重试！");
-      } else {
-        const image = document.getElementById("resultImage");
-        image.src = result.imageUrl;
-        image.style.display = "block";
+  <div id="loading">🎨 图像生成中，请稍候...</div>
+  <img id="resultImage" src="" alt="生成图像" />
+
+  <script>
+    async function generateImage() {
+      const flower = document.getElementById("flowerInput").value.trim();
+      const jellyfish = document.getElementById("jellyfishInput").value.trim();
+
+      if (!flower || !jellyfish) {
+        alert("请填写完整的提示词！");
+        return;
       }
-    } catch (error) {
-      document.getElementById("loading").style.display = "none";
-      console.error("生成请求失败：", error);
-      alert("生成请求失败，请稍后再试！");
+
+      document.getElementById("loading").style.display = "block";
+      document.getElementById("resultImage").style.display = "none";
+
+      try {
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ flower, jellyfish }),
+        });
+
+        const result = await response.json();
+        document.getElementById("loading").style.display = "none";
+
+        if (result.error) {
+          console.error("生成失败：", result.error);
+          alert("生成失败，请稍后再试！");
+        } else {
+          const image = document.getElementById("resultImage");
+          image.src = result.imageUrl;
+          image.style.display = "block";
+        }
+      } catch (error) {
+        document.getElementById("loading").style.display = "none";
+        console.error("生成请求失败：", error);
+        alert("请求失败，请检查网络或稍后再试！");
+      }
     }
-  }
-</script>
+  </script>
+</body>
+</html>
