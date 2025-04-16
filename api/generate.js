@@ -19,7 +19,6 @@ module.exports = async (req, res) => {
 
   // 确保 URI 路径与 API 文档匹配
   const uri = "/api/generate/comfyui/app";
-  // 使用花卉和水母的文本生成模型
   const requestBody = {
     templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
     generateParams: {
@@ -47,6 +46,10 @@ module.exports = async (req, res) => {
 
   const url = `https://openapi.liblibai.cloud${uri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
 
+  console.log("生成签名的 URL：", url);
+  console.log("生成的签名字符串：", stringToSign);
+  console.log("生成的签名：", signature);
+
   try {
     // 调用生成接口
     const response = await fetch(url, {
@@ -59,6 +62,7 @@ module.exports = async (req, res) => {
 
     const result = await response.json();
     if (result.code !== 0) {
+      console.error("生成请求失败，错误信息：", result);
       return res.status(500).json({ error: "生成失败：" + result.msg });
     }
 
@@ -66,6 +70,8 @@ module.exports = async (req, res) => {
 
     // 查询生成状态
     const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfyui/status?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
+    console.log("状态查询 URL：", statusUrl);
+    
     const statusResponse = await fetch(statusUrl, {
       method: "POST",
       headers: {
@@ -76,6 +82,7 @@ module.exports = async (req, res) => {
 
     const statusResult = await statusResponse.json();
     if (statusResult.code !== 0) {
+      console.error("状态查询失败，错误信息：", statusResult);
       return res.status(500).json({ error: "状态查询失败：" + statusResult.msg });
     }
 
