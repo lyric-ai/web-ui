@@ -28,12 +28,12 @@ export default async function handler(req, res) {
     });
 
     const result = await response.json();
+    console.log("Liblib 返回：", result); // 调试信息
 
-    if (!result || !result.request_id) {
-      return res.status(500).json({ error: '请求生成失败' });
+    if (!result?.request_id) {
+      return res.status(500).json({ error: '请求生成失败', raw: result });
     }
 
-    // 获取图像地址
     const statusRes = await fetch('https://openapi.liblibai.cloud/api/generate/comfy/status/', {
       method: 'POST',
       headers: {
@@ -45,15 +45,16 @@ export default async function handler(req, res) {
     });
 
     const statusResult = await statusRes.json();
+    console.log("状态查询返回：", statusResult); // 调试信息
 
     if (statusResult?.data?.images?.[0]?.url) {
       return res.status(200).json({ imageUrl: statusResult.data.images[0].url });
     } else {
-      return res.status(500).json({ error: '图像生成失败' });
+      return res.status(500).json({ error: '图像生成失败', raw: statusResult });
     }
 
   } catch (error) {
     console.error('生成图像失败:', error);
-    return res.status(500).json({ error: '服务端错误' });
+    return res.status(500).json({ error: '服务端错误', message: error.message });
   }
 }
