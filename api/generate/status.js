@@ -1,53 +1,32 @@
-// /api/generate/status.js
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Only POST allowed' });
+const fetch = require("node-fetch");
+const crypto = require("crypto");
+
+module.exports = async (req, res) => {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "只支持 POST 请求" });
   }
 
-  const { generateUuid } = req.body;
-  if (!generateUuid) {
-    return res.status(400).json({ error: 'Missing generateUuid' });
+  const { flower, jellyfish } = req.body;
+  if (!flower || !jellyfish) {
+    return res.status(400).json({ error: "缺少提示词参数" });
   }
 
-  const accessKey = process.env.LIBLIB_ACCESS_KEY;
-  const secretKey = process.env.LIBLIB_SECRET_KEY;
-
+  const accessKey = "NRXABtFaq2nlj-fRV4685Q";
+  const secretKey = "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf";
   const timestamp = Date.now().toString();
-  const nonce = Math.random().toString(36).substring(2);
-  const uri = "/api/generate/comfyui/status";
+  const nonce = Math.random().toString(36).substring(2, 15);
+
+  const uri = "/api/generate/comfyui/app"; // 修改路径为 /api/generate/comfyui/app
   const stringToSign = uri + "&" + timestamp + "&" + nonce;
+  const signature = crypto
+    .createHmac("sha1", secretKey)
+    .update(stringToSign)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 
-  const crypto = await import("crypto");
-  const hmac = crypto.createHmac("sha1", secretKey);
-  hmac.update(stringToSign);
-  const signature = hmac.digest("base64")
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const generateUrl = `https://openapi.liblibai.cloud${uri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
 
-  const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfy/status?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
-
-  try {
-    // 使用原生 fetch 代替 node-fetch
-    const response = await fetch(statusUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ generateUuid })
-    });
-
-    // 输出响应的原始内容以便调试
-    const responseBody = await response.text();
-    console.log("Response from Liblib API:", responseBody);
-
-    // 尝试解析 JSON 数据
-    const data = JSON.parse(responseBody);
-    
-    if (data.code !== 0) {
-      return res.status(500).json({ error: 'Error from Liblib API', message: data.msg });
-    }
-
-    // 如果状态为成功，返回结果数据
-    res.status(200).json(data.data);
-  } catch (err) {
-    console.error("Error checking status:", err);
-    res.status(500).json({ error: "Failed to check status" });
-  }
-}
+  const requestBody = {
+    templateUuid:
