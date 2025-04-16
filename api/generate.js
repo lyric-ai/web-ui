@@ -26,38 +26,50 @@ export default async function handler(req, res) {
   const url = `https://openapi.liblibai.cloud/api/generate/comfyui/app?AccessKey=${AccessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
 
   try {
-    // 第一步：提交生成请求
+    // 第一步：发出生成请求
     const libResponse = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inputs: { flower, jellyfish } })
+      body: JSON.stringify({
+        inputs: { flower, jellyfish }
+      })
     });
 
     const data = await libResponse.json();
+
     const uuid = data?.data?.generateUuid;
 
     if (!uuid) {
+      console.error("Liblib 返回异常：", data);
       return res.status(500).json({ error: "生成UUID失败" });
     }
 
-    // 第二步：轮询状态查询接口直到生成完成
-    const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfy/status`;
+    // 第二步：轮询获取图像状态
     let imageUrl = null;
+    const maxTries = 10;
+    let tries = 0;
 
-    for (let i = 0; i < 10; i++) {
-      const statusResponse = await fetch(`${statusUrl}?generateUuid=${uuid}`);
-      const statusData = await statusResponse.json();
+    while (tries < maxTries) {
+      const statusRes = await fetch(`https://openapi.liblibai.cloud/api/generate/comfy/status/${uuid}`);
+      const statusData = await statusRes.json();
 
-      if (statusData?.data?.status === 2) {
-        imageUrl = statusData?.data?.imageList?.[0]?.url;
+      if (statusData?.data?.status === "Success") {
+        imageUrl = statusData?.data?.imageList?.[0];
         break;
       }
 
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+      if (statusData?.data?.status === "Failed") {
+        console.error("生成失败：", statusData);
+        return res.status(500).json({ error: "图像生成失败" });
+      }
+
+      // 等待 2 秒再轮询
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      tries++;
     }
 
     if (!imageUrl) {
-      return res.status(500).json({ error: "图像生成超时或失败" });
+      return res.status(500).json({ error: "图像生成超时" });
     }
 
     return res.status(200).json({ imageUrl });
