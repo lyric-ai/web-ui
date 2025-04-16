@@ -1,107 +1,51 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>花与水母图像生成器</title>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Outfit', sans-serif;
-      background: #f0f4f8;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-    }
-
-    h2 {
-      margin-bottom: 20px;
-      color: #333;
-    }
-
-    input {
-      padding: 12px 16px;
-      font-size: 16px;
-      width: 300px;
-      margin-bottom: 10px;
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      outline: none;
-      transition: all 0.3s ease;
-    }
-
-    input:focus {
-      border-color: #4a90e2;
-      box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
-    }
-
-    button {
-      margin-top: 15px;
-      padding: 10px 20px;
-      background: #4a90e2;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-
-    button:hover {
-      background: #357ABD;
-    }
-
-    #loading {
-      margin-top: 20px;
-      font-size: 16px;
-      color: #555;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .spinner {
-      width: 18px;
-      height: 18px;
-      border: 3px solid #ccc;
-      border-top: 3px solid #4a90e2;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    #resultImage {
-      margin-top: 30px;
-      max-width: 90%;
-      max-height: 500px;
-      display: none;
-      border-radius: 16px;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-      transition: opacity 0.5s ease;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>图像生成</title>
 </head>
 <body>
-  <h2>输入你喜欢的花与水母，生成梦幻图像</h2>
-  <input type="text" id="flowerInput" placeholder="你喜欢的花，如：A single peony flower">
-  <input type="text" id="jellyfishInput" placeholder="你喜欢的水母，如：A jellyfish">
-  <button onclick="generateImage()">开始生成</button>
+  <h1>生成你的图像</h1>
+  
+  <label for="flowerInput">花朵提示：</label>
+  <input type="text" id="flowerInput" placeholder="请输入花朵的描述" />
+  
+  <label for="jellyfishInput">水母提示：</label>
+  <input type="text" id="jellyfishInput" placeholder="请输入水母的描述" />
+  
+  <button onclick="generateImage()">生成图像</button>
 
-  <div id="loading" style="display:none;">
-    <div class="spinner"></div>
-    <span>生成中，请稍候...</span>
-  </div>
+  <img id="resultImage" style="display:none; width: 100%; max-width: 600px; margin-top: 20px;" alt="生成的图像">
 
-  <img id="resultImage" src="" alt="生成结果图像">
+  <script>
+    async function generateImage() {
+      const flower = document.getElementById("flowerInput").value.trim();
+      const jellyfish = document.getElementById("jellyfishInput").value.trim();
 
-  <!-- 引入外部 JS 文件 -->
-  <script src="main.js"></script>
+      if (!flower || !jellyfish) {
+        alert("请填写完整的提示词！");
+        return;
+      }
+
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flower, jellyfish })
+      });
+
+      const result = await response.json();
+
+      if (result.error) {
+        console.log("生成失败：", result.error);
+        alert("生成失败，请重试！");
+      } else {
+        const imageUrl = result.imageUrl;
+        const image = document.getElementById("resultImage");
+        image.src = imageUrl;
+        image.style.display = "block";
+      }
+    }
+  </script>
 </body>
 </html>
