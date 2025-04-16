@@ -39,10 +39,11 @@ export default async function handler(req, res) {
 
     const uuid = data?.data?.generateUuid;
 
-    if (!uuid) {
-      console.error("Liblib 返回异常：", data);
-      return res.status(500).json({ error: "生成UUID失败" });
-    }
+   if (!uuid) {
+  console.error("Liblib 返回异常：", JSON.stringify(data, null, 2));
+  return res.status(500).json({ error: "生成UUID失败", raw: data });
+}
+
 
     // 第二步：轮询获取图像状态
     let imageUrl = null;
