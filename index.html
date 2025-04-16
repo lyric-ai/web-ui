@@ -21,7 +21,11 @@
       color: #333;
     }
 
-    #promptInput {
+    .input-group {
+      margin-bottom: 15px;
+    }
+
+    input[type="text"] {
       padding: 12px 16px;
       font-size: 16px;
       width: 300px;
@@ -31,7 +35,7 @@
       transition: all 0.3s ease;
     }
 
-    #promptInput:focus {
+    input[type="text"]:focus {
       border-color: #4a90e2;
       box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
     }
@@ -88,8 +92,13 @@
   </style>
 </head>
 <body>
-  <h2>输入提示词生成图片</h2>
-  <input type="text" id="promptInput" placeholder="例如：A single peony flower">
+  <h2>生成你喜欢的梦幻水母</h2>
+  <div class="input-group">
+    <input type="text" id="flowerInput" placeholder="你喜欢的花朵，例如：A single peony flower">
+  </div>
+  <div class="input-group">
+    <input type="text" id="jellyfishInput" placeholder="你喜欢的水母，例如：A jellyfish">
+  </div>
   <button onclick="generateImage()">开始生成</button>
 
   <div id="loading" style="display:none;">
@@ -98,65 +107,80 @@
   </div>
 
   <img id="resultImage" src="" alt="生成结果图像">
-  
+
   <script>
     async function generateImage() {
-      const prompt = document.getElementById("promptInput").value.trim();
-      if (!prompt) {
-        alert("请输入提示词！");
+      const flower = document.getElementById("flowerInput").value.trim();
+      const jellyfish = document.getElementById("jellyfishInput").value.trim();
+      if (!flower || !jellyfish) {
+        alert("请输入你喜欢的花朵和水母！");
         return;
       }
 
       document.getElementById("loading").style.display = "flex";
       document.getElementById("resultImage").style.display = "none";
 
-      const res = await fetch("/api/generate", {
+      const body = {
+        templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
+        generateParams: {
+          "63": {
+            class_type: "CLIPTextEncode",
+            inputs: { text: jellyfish }
+          },
+          "65": {
+            class_type: "CLIPTextEncode",
+            inputs: { text: flower }
+          },
+          workflowUuid: "5f7cf756fd804deeac558322dc5bd813"
+        }
+      };
+
+      const res = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify(body)
       });
 
       const result = await res.json();
-      if (result.error) {
-        alert("生成失败: " + result.error);
+      if (result.code !== 0 || !result.data?.generateUuid) {
+        alert("生成失败，请稍后再试。");
         document.getElementById("loading").style.display = "none";
         return;
       }
 
-      const { generateUuid } = result;
-      checkStatus(generateUuid);
+      checkStatus(result.data.generateUuid);
     }
 
     async function checkStatus(generateUuid) {
-  let tries = 0;
-  const interval = setInterval(async () => {
-    tries++;
-    const res = await fetch("/api/generate/status", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ generateUuid })
-    });
+      let tries = 0;
+      const interval = setInterval(async () => {
+        tries++;
+        const res = await fetch("https://openapi.liblibai.cloud/api/generate/comfy/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ generateUuid })
+        });
 
-    const result = await res.json();
+        const result = await res.json();
 
-    if (result.code === 0 && result.data.generateStatus === 5) {
-      clearInterval(interval);
-      const imgUrl = result.data.images[0].imageUrl;
-      const img = document.getElementById("resultImage");
-      img.src = imgUrl;
-      img.style.display = "block";
-      img.style.opacity = 0;
-      setTimeout(() => img.style.opacity = 1, 50);
-      document.getElementById("loading").style.display = "none";
+        if (result.code === 0 && result.data.generateStatus === 5) {
+          clearInterval(interval);
+          const imgUrl = result.data.images[0].imageUrl;
+          const img = document.getElementById("resultImage");
+          img.src = imgUrl;
+          img.style.display = "block";
+          img.style.opacity = 0;
+          setTimeout(() => img.style.opacity = 1, 50);
+          document.getElementById("loading").style.display = "none";
+        }
+
+        if (tries >= 20) {
+          clearInterval(interval);
+          alert("生成超时，请稍后再试。");
+          document.getElementById("loading").style.display = "none";
+        }
+      }, 3000);
     }
-
-    if (tries >= 20) {
-      clearInterval(interval);
-      alert("生成超时，请稍后再试。");
-      document.getElementById("loading").style.display = "none";
-    }
-  }, 3000);
-}
   </script>
 </body>
 </html>
