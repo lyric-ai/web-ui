@@ -1,77 +1,68 @@
 import crypto from "crypto";
-import fetch from "node-fetch";
-
-const accessKey = process.env.LIBLIB_ACCESS_KEY || "你的AccessKey";
-const secretKey = process.env.LIBLIB_SECRET_KEY || "你的SecretKey";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ error: "Method Not Allowed" });
   }
 
   const { flower, jellyfish } = req.body;
-  if (!flower || !jellyfish) {
-    return res.status(400).json({ error: "缺少必要的提示词" });
-  }
 
-  const mergedPrompt = `${flower} 元素融合成一只 ${jellyfish}`;
+  const AccessKey = process.env.LIBLIB_ACCESS_KEY || "你的AccessKey";
+  const SecretKey = process.env.LIBLIB_SECRET_KEY || "你的SecretKey";
 
   const timestamp = Date.now().toString();
-  const signature = crypto.createHmac("sha256", secretKey)
-    .update(timestamp)
-    .digest("hex");
+  const nonce = Math.random().toString(36).substring(2, 10);
+  const uri = "/api/generate/comfyui/app";
+  const raw = `${uri}&${timestamp}&${nonce}`;
+
+  const signature = crypto
+    .createHmac("sha1", SecretKey)
+    .update(raw)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  const url = `https://openapi.liblibai.cloud/api/generate/comfyui/app?AccessKey=${AccessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
 
   try {
-    const response = await fetch("https://api.liblib.ai/v1/gen", {
+    // 第一步：提交生成请求
+    const libResponse = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "AccessKey": accessKey,
-        "Timestamp": timestamp,
-        "Signature": signature,
-      },
-      body: JSON.stringify({
-        model: "juggernaut-xl-v8",
-        prompt: mergedPrompt,
-        style: "dreamy",
-        size: "1024x1024"
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inputs: { flower, jellyfish } })
     });
 
-    const data = await response.json();
-    console.log("Liblib 响应内容：", data);
-    const uuid = data?.data?.uuid;
-    console.log("拿到的 UUID：", uuid);
+    const data = await libResponse.json();
+    const uuid = data?.data?.generateUuid;
 
     if (!uuid) {
-      return res.status(500).json({ error: "生成任务创建失败", liblib: data });
+      return res.status(500).json({ error: "生成UUID失败" });
     }
 
-    // 等待图像生成完成（轮询）
-    const waitForImage = async (uuid, retries = 15, interval = 2000) => {
-      for (let i = 0; i < retries; i++) {
-        const imageResponse = await fetch(`https://api.liblib.ai/v1/image/${uuid}`, {
-          headers: {
-            "AccessKey": accessKey,
-            "Timestamp": timestamp,
-            "Signature": signature,
-          },
-        });
-        const imageData = await imageResponse.json();
-        console.log("图像接口响应：", imageData);
+    // 第二步：轮询状态查询接口直到生成完成
+    const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfy/status`;
+    let imageUrl = null;
 
-        const imageUrl = imageData?.data?.images?.[0]?.url;
-        if (imageUrl) return imageUrl;
-        await new Promise(r => setTimeout(r, interval));
+    for (let i = 0; i < 10; i++) {
+      const statusResponse = await fetch(`${statusUrl}?generateUuid=${uuid}`);
+      const statusData = await statusResponse.json();
+
+      if (statusData?.data?.status === 2) {
+        imageUrl = statusData?.data?.imageList?.[0]?.url;
+        break;
       }
-      return null;
-    };
 
-    const imageUrl = await waitForImage(uuid);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // 等待2秒
+    }
 
-    res.status(200).json({ imageUrl });
+    if (!imageUrl) {
+      return res.status(500).json({ error: "图像生成超时或失败" });
+    }
+
+    return res.status(200).json({ imageUrl });
   } catch (error) {
-    console.error("生成失败：", error);
-    res.status(500).json({ error: "服务器错误", detail: error.message });
+    console.error("Liblib 请求失败：", error);
+    return res.status(500).json({ error: "生成失败，请稍后再试" });
   }
 }
