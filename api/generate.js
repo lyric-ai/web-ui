@@ -17,8 +17,20 @@ module.exports = async (req, res) => {
   const timestamp = Date.now().toString();
   const nonce = Math.random().toString(36).substring(2, 15);
 
-  // 确保 URI 路径与 API 文档匹配
+  // 生成请求签名
   const uri = "/api/generate/comfyui/app";
+  const stringToSign = uri + "&" + timestamp + "&" + nonce;
+  const signature = crypto
+    .createHmac("sha1", secretKey)
+    .update(stringToSign)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  const generateUrl = `https://openapi.liblibai.cloud${uri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
+  console.log("生成签名的 URL：", generateUrl);
+
   const requestBody = {
     templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
     generateParams: {
@@ -34,25 +46,9 @@ module.exports = async (req, res) => {
     }
   };
 
-  // 计算签名字符串
-  const stringToSign = uri + "&" + timestamp + "&" + nonce;
-  const signature = crypto
-    .createHmac("sha1", secretKey)
-    .update(stringToSign)
-    .digest("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-
-  const url = `https://openapi.liblibai.cloud${uri}?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
-
-  console.log("生成签名的 URL：", url);
-  console.log("生成的签名字符串：", stringToSign);
-  console.log("生成的签名：", signature);
-
   try {
     // 调用生成接口
-    const response = await fetch(url, {
+    const response = await fetch(generateUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -68,10 +64,25 @@ module.exports = async (req, res) => {
 
     const generateUuid = result.data.generateUuid;
 
-    // 查询生成状态
-    const statusUrl = `https://openapi.liblibai.cloud/api/generate/comfyui/status?AccessKey=${accessKey}&Signature=${signature}&Timestamp=${timestamp}&SignatureNonce=${nonce}`;
+    // 查询生成状态时，重新生成签名和时间戳
+    const statusTimestamp = Date.now().toString();
+    const statusNonce = Math.random().toString(36).substring(2, 15);
+
+    // 计算查询请求的签名
+    const statusUri = "/api/generate/comfyui/status";
+    const statusStringToSign = statusUri + "&" + statusTimestamp + "&" + statusNonce;
+    const statusSignature = crypto
+      .createHmac("sha1", secretKey)
+      .update(statusStringToSign)
+      .digest("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    const statusUrl = `https://openapi.liblibai.cloud${statusUri}?AccessKey=${accessKey}&Signature=${statusSignature}&Timestamp=${statusTimestamp}&SignatureNonce=${statusNonce}`;
     console.log("状态查询 URL：", statusUrl);
-    
+
+    // 查询生成状态
     const statusResponse = await fetch(statusUrl, {
       method: "POST",
       headers: {
