@@ -25,13 +25,16 @@ export default async function handler(req, res) {
   };
 
   try {
-    const liblibRes = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "AccessKey": "NRXABtFaq2nlj-fRV4685Q",
-        "SecretKey": "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf"
-      },
+    const accessKey = process.env.LIBLIB_ACCESS_KEY;
+const secretKey = process.env.LIBLIB_SECRET_KEY;
+
+const liblibRes = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "AccessKey": accessKey,
+    "SecretKey": secretKey
+  },
       body: JSON.stringify(requestBody)
     });
 
