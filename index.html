@@ -1,16 +1,42 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>梦幻水母生成器</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 2em;
+    }
+    #loading {
+      display: none;
+      font-size: 1.2em;
+      margin-top: 1em;
+    }
+    img {
+      margin-top: 1em;
+      max-width: 80%;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #ccc;
+    }
+  </style>
 </head>
 <body>
-  <input id="flowerInput" placeholder="请输入植物关键词" />
-  <input id="jellyfishInput" placeholder="请输入水母关键词" />
-  <button onclick="generateImage()">生成图像</button>
+  <h1>梦幻水母生成器</h1>
 
-  <div id="loading" style="display:none;">生成中...</div>
-  <img id="resultImage" style="display:none; max-width: 100%;" />
+  <p>
+    花朵情绪提示词：<input id="flowerInput" placeholder="例如：温柔、热烈的玫瑰">
+  </p>
+  <p>
+    水母情绪提示词：<input id="jellyfishInput" placeholder="例如：梦幻、宁静的水母">
+  </p>
+
+  <button onclick="generateImage()">点击生成图像</button>
+
+  <div id="loading">生成中，请稍候...</div>
+
+  <img id="resultImage" style="display: none;" />
 
   <script>
     async function generateImage() {
@@ -35,18 +61,19 @@
         const result = await response.json();
         document.getElementById("loading").style.display = "none";
 
-        if (result.imageUrl) {
+        if (result.error) {
+          console.error("生成失败：", result.error);
+          alert("生成失败，请重试！");
+        } else {
           const image = document.getElementById("resultImage");
           image.src = result.imageUrl;
           image.style.display = "block";
-        } else {
-          alert("生成失败！");
-          console.error(result);
         }
-      } catch (err) {
+
+      } catch (error) {
         document.getElementById("loading").style.display = "none";
-        alert("生成请求失败！");
-        console.error("生成请求失败：", err);
+        console.error("生成请求失败：", error);
+        alert("生成请求失败，请稍后再试！");
       }
     }
   </script>
