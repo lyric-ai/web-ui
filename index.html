@@ -15,38 +15,60 @@
       padding: 10px;
       margin: 10px;
       font-size: 1rem;
+      border-radius: 8px;
+      border: none;
+    }
+    button {
+      background-color: #4caf50;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
     }
     #result {
       margin-top: 2rem;
       font-size: 1.2rem;
       color: #333;
     }
-    img {
-      max-width: 90%;
-      margin-top: 20px;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    #image-preview {
+      margin-top: 1rem;
+      max-width: 100%;
     }
   </style>
 </head>
 <body>
-  <h1>梦幻水母生成器</h1>
-  <p>请输入关键词：</p>
-  <input type="text" id="flower" placeholder="鲜花关键词" />
-  <input type="text" id="jellyfish" placeholder="水母关键词" />
-  <br />
-  <button onclick="generate()">开始生成</button>
+  <h1>🌈 梦幻水母生成器</h1>
+
+  <div>
+    <p>请输入关键词：</p>
+    <input type="text" id="flower" placeholder="鲜花关键词" />
+    <input type="text" id="jellyfish" placeholder="水母关键词" />
+    <br />
+    <button onclick="generate()">开始生成</button>
+  </div>
+
   <div id="result"></div>
+
+  <hr style="margin: 40px 0;" />
+
+  <div>
+    <h2>🔍 查询生成状态</h2>
+    <input type="text" id="uuidInput" placeholder="请输入生成 UUID" />
+    <br />
+    <button onclick="checkStatus()">查询状态</button>
+    <div id="status"></div>
+    <img id="image-preview" />
+  </div>
 
   <script>
     async function generate() {
       const flower = document.getElementById('flower').value.trim();
       const jellyfish = document.getElementById('jellyfish').value.trim();
       const result = document.getElementById('result');
-      result.textContent = "🎨 正在生成，请稍候...";
+      result.textContent = "生成中...";
 
       try {
-        // Step 1: 发起生成任务
         const res = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -54,33 +76,46 @@
         });
 
         const data = await res.json();
-        if (!res.ok || !data.generateUuid) {
+        if (!res.ok) {
           throw new Error(data.error || '生成失败');
         }
 
-        const uuid = data.generateUuid;
-        result.innerHTML = `✅ 任务已提交，UUID：<code>${uuid}</code><br>图像生成中...`;
-
-        // Step 2: 开始轮询状态接口
-        const pollStatus = async () => {
-          const statusRes = await fetch(`/api/status?uuid=${uuid}`);
-          const statusData = await statusRes.json();
-
-          if (statusData.status === 'succeeded' && statusData.imageUrl) {
-            result.innerHTML = `🎉 图像生成成功！<br><img src="${statusData.imageUrl}" alt="生成图像" />`;
-          } else if (statusData.status === 'failed') {
-            result.textContent = "❌ 图像生成失败，请重试！";
-          } else {
-            // 等待 2 秒后继续轮询
-            setTimeout(pollStatus, 2000);
-          }
-        };
-
-        pollStatus();
-
+        result.innerHTML = `✅ 任务提交成功！<br>生成 UUID：<code>${data.generateUuid}</code>`;
+        document.getElementById('uuidInput').value = data.generateUuid;
       } catch (err) {
         console.error(err);
         result.textContent = "❌ 出错了：" + err.message;
+      }
+    }
+
+    async function checkStatus() {
+      const uuid = document.getElementById('uuidInput').value.trim();
+      const statusDiv = document.getElementById('status');
+      const imagePreview = document.getElementById('image-preview');
+      statusDiv.textContent = "查询中...";
+      imagePreview.src = "";
+
+      try {
+        const res = await fetch('/api/generate/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ generateUuid: uuid })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || '查询失败');
+        }
+
+        if (data.status === 'done') {
+          statusDiv.innerHTML = `🎉 生成完成！<br>图片地址：<a href="${data.imageUrl}" target="_blank">${data.imageUrl}</a>`;
+          imagePreview.src = data.imageUrl;
+        } else {
+          statusDiv.textContent = `⏳ 当前状态：${data.status}`;
+        }
+      } catch (err) {
+        console.error(err);
+        statusDiv.textContent = "❌ 出错了：" + err.message;
       }
     }
   </script>
