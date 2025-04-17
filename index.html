@@ -69,7 +69,8 @@
       result.textContent = "生成中...";
 
       try {
-        const res = await fetch('/api/generate', {
+        const res = await fetch('/api/generate.cjs'
+, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ flower, jellyfish })
