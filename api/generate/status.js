@@ -11,37 +11,37 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: '缺少 generateUuid 参数' });
   }
 
-  const url = `https://api.liblib.ai/api/generate/query?generateUuid=${generateUuid}`;
-
   try {
-    const libRes = await fetch(url);
-    const text = await libRes.text();
+    const queryRes = await fetch('https://openapi.liblibai.cloud/api/generate/comfy/status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ generateUuid })
+    });
 
+    const text = await queryRes.text();
     let data;
+
     try {
       data = JSON.parse(text);
-    } catch (e) {
-      console.error("❌ Liblib 响应不是 JSON：", text);
-      return res.status(500).json({ error: "返回了非 JSON 内容：" + text });
+    } catch {
+      return res.status(500).json({ error: '返回内容非 JSON: ' + text });
     }
 
-    if (!libRes.ok) {
-      return res.status(libRes.status).json({ error: data?.error || '状态查询失败' });
+    if (!queryRes.ok || data?.code !== 0) {
+      return res.status(500).json({ error: data?.msg || '查询失败' });
     }
 
-    // 如果状态完成则拼接图像地址
-    if (data.status === 'done' && data?.imageUrls?.[0]) {
-      return res.status(200).json({
-        status: 'done',
-        imageUrl: data.imageUrls[0]
-      });
+    const status = data.data.generateStatus;
+    const imageUrl = data.data.images?.[0]?.imageUrl;
+
+    if (status === 5 && imageUrl) {
+      return res.status(200).json({ status: 'done', imageUrl });
+    } else {
+      return res.status(200).json({ status: `生成中 (${status})` });
     }
-
-    // 如果未完成则返回原始状态
-    return res.status(200).json({ status: data.status || 'unknown' });
-
   } catch (err) {
-    console.error("❌ 状态查询失败：", err);
-    return res.status(500).json({ error: '请求失败：' + err.message });
+    return res.status(500).json({ error: "查询失败：" + err.message });
   }
 }
