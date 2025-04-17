@@ -17,24 +17,31 @@ export default async function handler(req, res) {
 
   const timestamp = Date.now().toString();
   const nonce = Math.random().toString(36).substring(2, 15);
-  const uri = "/api/generate/comfyui/app";
+  const uri = "/api/generate/comfyui/app";  // ✅ 这个签名路径必须保持这样
+
   const stringToSign = uri + "&" + timestamp + "&" + nonce;
 
   const signature = crypto.createHmac('sha1', secretKey)
     .update(stringToSign)
     .digest('base64')
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 
   const body = {
     templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
     generateParams: {
       "63": {
         class_type: "CLIPTextEncode",
-        inputs: { text: jellyfish }
+        inputs: {
+          text: jellyfish
+        }
       },
       "65": {
         class_type: "CLIPTextEncode",
-        inputs: { text: flower }
+        inputs: {
+          text: flower
+        }
       },
       workflowUuid: "5f7cf756fd804deeac558322dc5bd813"
     }
