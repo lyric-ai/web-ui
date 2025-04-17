@@ -144,7 +144,7 @@
       const downloadBtn = document.getElementById('download-button');
 
       let attempts = 0;
-      const maxAttempts = 30;
+      const maxAttempts = 50;
       const delay = 3000;
 
       const interval = setInterval(async () => {
@@ -157,23 +157,35 @@
           });
 
           const data = await res.json();
-          console.log("🧪 后端 raw 返回内容：", data.raw);  // ✅ 控制台调试输出
+          console.log("✅ 当前状态：", data.status);
+          if (data.imageUrl) console.log("✅ 图片地址：", data.imageUrl);
 
-          statusDiv.textContent = "🧪 正在调试查看状态，请查看控制台输出（F12）";
+          if (data.status === 'done' && data.imageUrl) {
+            clearInterval(interval);
+            showSpinner(false);
+            statusDiv.innerHTML = `🎉 图片生成完成！<br><a href="${data.imageUrl}" target="_blank">点击查看原图</a>`;
+            imagePreview.src = data.imageUrl;
+            downloadBtn.href = data.imageUrl;
+            downloadBtn.style.display = "inline-block";
+          } else {
+            statusDiv.textContent = `⏳ ${data.status}...`;
+          }
 
           if (attempts >= maxAttempts) {
             clearInterval(interval);
+            showSpinner(false);
             statusDiv.textContent = "⚠️ 查询超时，请稍后再试。";
           }
         } catch (err) {
           console.error(err);
           clearInterval(interval);
+          showSpinner(false);
           statusDiv.textContent = "❌ 查询失败：" + err.message;
         }
       }, delay);
     }
 
-    async function checkStatus() {
+    function checkStatus() {
       const uuid = document.getElementById('uuidInput').value.trim();
       if (!uuid) return alert("请输入 UUID");
 
