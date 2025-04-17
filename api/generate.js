@@ -17,9 +17,9 @@ export default async function handler(req, res) {
 
   const timestamp = Date.now().toString();
   const nonce = Math.random().toString(36).substring(2, 15);
-  const uri = "/api/generate/comfyui/app";  // ✅ 这个签名路径必须保持这样
+  const uri = "/api/generate/comfyui/app";
 
-  const stringToSign = uri + "&" + timestamp + "&" + nonce;
+  const stringToSign = `${uri}&${timestamp}&${nonce}`;
 
   const signature = crypto.createHmac('sha1', secretKey)
     .update(stringToSign)
@@ -27,6 +27,13 @@ export default async function handler(req, res) {
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/, "");
+
+  const queryParams = new URLSearchParams({
+    AccessKey: accessKey,
+    Signature: signature,
+    Timestamp: timestamp,
+    SignatureNonce: nonce
+  });
 
   const body = {
     templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
@@ -48,13 +55,11 @@ export default async function handler(req, res) {
   };
 
   try {
-    const libRes = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
+    const url = `https://openapi.liblibai.cloud${uri}?${queryParams.toString()}`;
+
+    const libRes = await fetch(url, {
       method: 'POST',
       headers: {
-        'access-key': accessKey,
-        'signature': signature,
-        'timestamp': timestamp,
-        'nonce': nonce,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(body)
@@ -65,8 +70,8 @@ export default async function handler(req, res) {
 
     try {
       data = JSON.parse(text);
-    } catch (e) {
-      return res.status(500).json({ error: "Liblib 返回了非 JSON：" + text });
+    } catch {
+      return res.status(500).json({ error: "返回非 JSON：" + text });
     }
 
     if (!libRes.ok || data?.code !== 0) {
