@@ -1,64 +1,45 @@
-export default async function handler(req, res) {
+const crypto = require("crypto");
+
+module.exports = async (req, res) => {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "仅支持 POST 请求" });
+    return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  const { flower, jellyfish } = req.body;
+  const accessKey = "NRXABtFaq2nlj-fRV4685Q";
+  const secretKey = "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf";
 
-  if (!flower || !jellyfish) {
-    return res.status(400).json({ error: "缺少提示词参数" });
+  const { prompt } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ error: "Prompt is required" });
   }
 
-  const ACCESS_KEY = 'NRXABtFaq2nlj-fRV4685Q';
-  const SECRET_KEY = 'VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf';
+  const timestamp = Date.now().toString();
+  const nonce = Math.random().toString(36).substring(2, 15);
+  const uri = "/api/generate/comfyui/app";
+  const stringToSign = uri + "&" + timestamp + "&" + nonce;
 
-  const payload = {
-    inputs: {
-      "63": { text: jellyfish },
-      "65": { text: flower }
-    }
-  };
+  const signature = crypto.createHmac("sha1", secretKey)
+    .update(stringToSign)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 
-  try {
-    // 使用 Vercel 自带的 fetch
-    const response = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "AccessKey": ACCESS_KEY,
-        "SecretKey": SECRET_KEY
-      },
-      body: JSON.stringify(payload)
-    });
+  const response = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "AccessKey": accessKey,
+      "Signature": signature,
+      "Timestamp": timestamp,
+      "SignatureNonce": nonce,
+    },
+    body: JSON.stringify({
+      templateUuid: "4df2efa0f18d46dc9758803e478eb51c", // 如果你有自定义 workflow UUID 请替换
+      generateParam: { prompt },
+    }),
+  });
 
-    const result = await response.json();
-
-    if (result.code !== 200 || !result.data?.task_id) {
-      console.error("生成失败：", result);
-      return res.status(500).json({ error: "请求生成失败", raw: result });
-    }
-
-    const taskId = result.data.task_id;
-
-    const statusResponse = await fetch(`https://openapi.liblibai.cloud/api/generate/comfy/status/?task_id=${taskId}`, {
-      method: "GET",
-      headers: {
-        "AccessKey": ACCESS_KEY,
-        "SecretKey": SECRET_KEY
-      }
-    });
-
-    const statusResult = await statusResponse.json();
-
-    if (statusResult.code !== 200 || !statusResult.data?.image_urls?.[0]) {
-      console.error("图像获取失败：", statusResult);
-      return res.status(500).json({ error: "图像获取失败", raw: statusResult });
-    }
-
-    return res.status(200).json({ imageUrl: statusResult.data.image_urls[0] });
-
-  } catch (err) {
-    console.error("请求异常：", err);
-    return res.status(500).json({ error: "服务异常", detail: err.message });
-  }
-}
+  const data = await response.json();
+  return res.status(200).json(data);
+};
