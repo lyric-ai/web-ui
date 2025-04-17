@@ -1,10 +1,7 @@
-const fetch = require('node-fetch');
-const crypto = require('crypto');
+import fetch from 'node-fetch';
+import crypto from 'crypto';
 
-/**
- * ComfyUI 图像生成接口代理
- */
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
@@ -13,10 +10,8 @@ module.exports = async (req, res) => {
   const secretKey = "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf";
 
   const { flower, jellyfish } = req.body;
-
   const promptText = `${flower} ${jellyfish}`;
 
-  // 构造签名
   const timestamp = Date.now().toString();
   const nonce = Math.random().toString(36).substring(2, 15);
   const uri = "/api/generate/comfyui/app";
@@ -76,4 +71,4 @@ module.exports = async (req, res) => {
     console.error("❌ 请求失败：", err);
     return res.status(500).json({ error: "请求失败：" + err.message });
   }
-};
+}
