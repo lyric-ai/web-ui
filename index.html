@@ -1,35 +1,88 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Liblib AI Image Generator</title>
+  <title>梦幻水母生成器</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background: linear-gradient(to right, #a1c4fd, #c2e9fb);
+      text-align: center;
+    }
+    input, button {
+      padding: 10px;
+      margin: 10px;
+      font-size: 1rem;
+    }
+    #result {
+      margin-top: 2rem;
+      font-size: 1.2rem;
+      color: #333;
+    }
+    img {
+      max-width: 90%;
+      margin-top: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+  </style>
 </head>
 <body>
-  <h1>Liblib AI Image Generator</h1>
-  <textarea id="prompt" placeholder="Enter your prompt here..." rows="4" cols="50"></textarea><br>
-  <button id="generate">Generate</button>
+  <h1>梦幻水母生成器</h1>
+  <p>请输入关键词：</p>
+  <input type="text" id="flower" placeholder="鲜花关键词" />
+  <input type="text" id="jellyfish" placeholder="水母关键词" />
+  <br />
+  <button onclick="generate()">开始生成</button>
   <div id="result"></div>
 
   <script>
-    document.getElementById("generate").addEventListener("click", async () => {
-      const prompt = document.getElementById("prompt").value;
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt }),
-      });
+    async function generate() {
+      const flower = document.getElementById('flower').value.trim();
+      const jellyfish = document.getElementById('jellyfish').value.trim();
+      const result = document.getElementById('result');
+      result.textContent = "🎨 正在生成，请稍候...";
 
-      const data = await response.json();
-      const resultDiv = document.getElementById("result");
-      if (data.image_url) {
-        resultDiv.innerHTML = `<img src="${data.image_url}" width="512">`;
-      } else {
-        resultDiv.textContent = "Error: " + JSON.stringify(data);
+      try {
+        // Step 1: 发起生成任务
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ flower, jellyfish })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.generateUuid) {
+          throw new Error(data.error || '生成失败');
+        }
+
+        const uuid = data.generateUuid;
+        result.innerHTML = `✅ 任务已提交，UUID：<code>${uuid}</code><br>图像生成中...`;
+
+        // Step 2: 开始轮询状态接口
+        const pollStatus = async () => {
+          const statusRes = await fetch(`/api/status?uuid=${uuid}`);
+          const statusData = await statusRes.json();
+
+          if (statusData.status === 'succeeded' && statusData.imageUrl) {
+            result.innerHTML = `🎉 图像生成成功！<br><img src="${statusData.imageUrl}" alt="生成图像" />`;
+          } else if (statusData.status === 'failed') {
+            result.textContent = "❌ 图像生成失败，请重试！";
+          } else {
+            // 等待 2 秒后继续轮询
+            setTimeout(pollStatus, 2000);
+          }
+        };
+
+        pollStatus();
+
+      } catch (err) {
+        console.error(err);
+        result.textContent = "❌ 出错了：" + err.message;
       }
-    });
+    }
   </script>
 </body>
 </html>
