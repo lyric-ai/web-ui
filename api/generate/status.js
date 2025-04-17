@@ -20,12 +20,15 @@ export default async function handler(req, res) {
       body: JSON.stringify({ generateUuid }),
     });
 
+    const contentType = response.headers.get("content-type");
+
     const text = await response.text();
 
-    try {
+    // 判断返回是否为 JSON 格式
+    if (contentType && contentType.includes("application/json")) {
       const data = JSON.parse(text);
 
-      // 返回成功状态（你可以根据 data 的格式再进一步细化）
+      // 判断是否生成成功
       if (data.status === 'done' && data.result?.[0]?.url) {
         return res.status(200).json({
           status: data.status,
@@ -33,18 +36,20 @@ export default async function handler(req, res) {
         });
       } else {
         return res.status(200).json({
-          status: data.status,
+          status: data.status || 'processing',
           raw: data,
         });
       }
-
-    } catch (jsonErr) {
-      console.error('解析 JSON 失败:', text);
-      return res.status(500).json({ error: '返回内容不是合法 JSON', raw: text });
+    } else {
+      // 返回非 JSON，说明服务器报错
+      return res.status(500).json({
+        error: 'Liblib 接口返回错误（非 JSON）',
+        raw: text,
+      });
     }
 
   } catch (err) {
-    console.error('请求出错:', err);
-    return res.status(500).json({ error: '服务器错误', message: err.message });
+    console.error('请求异常:', err);
+    return res.status(500).json({ error: '服务器异常', message: err.message });
   }
 }
