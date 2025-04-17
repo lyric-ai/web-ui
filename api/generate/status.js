@@ -33,13 +33,13 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: data?.msg || '查询失败' });
     }
 
-    const status = data.data.generateStatus;
+    const statusCode = data.data.generateStatus;
     const imageUrl = data.data.images?.[0]?.imageUrl;
 
-    if (status === 5 && imageUrl) {
+    if (statusCode === 5 && imageUrl) {
       return res.status(200).json({ status: 'done', imageUrl });
     } else {
-      return res.status(200).json({ status: `生成中 (${status})` });
+      return res.status(200).json({ status: `状态码：${statusCode}` });
     }
   } catch (err) {
     return res.status(500).json({ error: "查询失败：" + err.message });
