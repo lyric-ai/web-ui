@@ -69,14 +69,20 @@
       result.textContent = "生成中...";
 
       try {
-        const res = await fetch('/api/generate.cjs'
-, {
+        const res = await fetch('/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ flower, jellyfish })
         });
 
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          throw new Error("不是有效的 JSON 响应：" + text);
+        }
+
         if (!res.ok) {
           throw new Error(data.error || '生成失败');
         }
@@ -103,7 +109,14 @@
           body: JSON.stringify({ generateUuid: uuid })
         });
 
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          throw new Error("不是有效的 JSON 响应：" + text);
+        }
+
         if (!res.ok) {
           throw new Error(data.error || '查询失败');
         }
