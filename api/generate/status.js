@@ -1,8 +1,8 @@
-// 文件路径: /api/generate/status.js
+import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: '仅支持 POST 请求' });
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   const { generateUuid } = req.body;
@@ -11,45 +11,37 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: '缺少 generateUuid 参数' });
   }
 
+  const url = `https://api.liblib.ai/api/generate/query?generateUuid=${generateUuid}`;
+
   try {
-    const response = await fetch('https://openapi.liblibai.cloud/api/generate/comfy/status', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ generateUuid }),
-    });
+    const libRes = await fetch(url);
+    const text = await libRes.text();
 
-    const contentType = response.headers.get("content-type");
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      console.error("❌ Liblib 响应不是 JSON：", text);
+      return res.status(500).json({ error: "返回了非 JSON 内容：" + text });
+    }
 
-    const text = await response.text();
+    if (!libRes.ok) {
+      return res.status(libRes.status).json({ error: data?.error || '状态查询失败' });
+    }
 
-    // 判断返回是否为 JSON 格式
-    if (contentType && contentType.includes("application/json")) {
-      const data = JSON.parse(text);
-
-      // 判断是否生成成功
-      if (data.status === 'done' && data.result?.[0]?.url) {
-        return res.status(200).json({
-          status: data.status,
-          imageUrl: data.result[0].url,
-        });
-      } else {
-        return res.status(200).json({
-          status: data.status || 'processing',
-          raw: data,
-        });
-      }
-    } else {
-      // 返回非 JSON，说明服务器报错
-      return res.status(500).json({
-        error: 'Liblib 接口返回错误（非 JSON）',
-        raw: text,
+    // 如果状态完成则拼接图像地址
+    if (data.status === 'done' && data?.imageUrls?.[0]) {
+      return res.status(200).json({
+        status: 'done',
+        imageUrl: data.imageUrls[0]
       });
     }
 
+    // 如果未完成则返回原始状态
+    return res.status(200).json({ status: data.status || 'unknown' });
+
   } catch (err) {
-    console.error('请求异常:', err);
-    return res.status(500).json({ error: '服务器异常', message: err.message });
+    console.error("❌ 状态查询失败：", err);
+    return res.status(500).json({ error: '请求失败：' + err.message });
   }
 }
