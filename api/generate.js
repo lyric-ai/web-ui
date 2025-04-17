@@ -1,45 +1,70 @@
-const crypto = require("crypto");
-
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const accessKey = "NRXABtFaq2nlj-fRV4685Q";
-  const secretKey = "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf";
+  const { flower, jellyfish } = req.body;
 
-  const { prompt } = req.body;
-  if (!prompt) {
-    return res.status(400).json({ error: "Prompt is required" });
-  }
+  const AccessKey = "NRXABtFaq2nlj-fRV4685Q";
+  const SecretKey = "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf";
+  const apiUrl = "https://openapi.liblibai.cloud/api/generate/comfyui/app";
 
-  const timestamp = Date.now().toString();
-  const nonce = Math.random().toString(36).substring(2, 15);
-  const uri = "/api/generate/comfyui/app";
-  const stringToSign = uri + "&" + timestamp + "&" + nonce;
-
-  const signature = crypto.createHmac("sha1", secretKey)
-    .update(stringToSign)
-    .digest("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-
-  const response = await fetch("https://openapi.liblibai.cloud/api/generate/comfyui/app", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "AccessKey": accessKey,
-      "Signature": signature,
-      "Timestamp": timestamp,
-      "SignatureNonce": nonce,
+  const payload = {
+    workflow_name: "梦幻水母",
+    prompt: {
+      "鲜花关键词": flower,
+      "水母关键词": jellyfish
     },
-    body: JSON.stringify({
-      templateUuid: "4df2efa0f18d46dc9758803e478eb51c", // 如果你有自定义 workflow UUID 请替换
-      generateParam: { prompt },
-    }),
-  });
+    key: {
+      access_key: AccessKey,
+      secret_key: SecretKey
+    }
+  };
 
-  const data = await response.json();
-  return res.status(200).json(data);
-};
+  try {
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (data.code !== 200 || !data.data || !data.data.task_id) {
+      return res.status(500).json({ error: "Liblib 任务提交失败", liblibResponse: data });
+    }
+
+    const taskId = data.data.task_id;
+
+    // 等待生成完成
+    await new Promise(resolve => setTimeout(resolve, 6000));
+
+    const statusRes = await fetch("https://openapi.liblibai.cloud/api/generate/comfy/status", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        task_id: taskId,
+        key: {
+          access_key: AccessKey,
+          secret_key: SecretKey
+        }
+      })
+    });
+
+    const statusData = await statusRes.json();
+
+    if (statusData.code !== 200 || !statusData.data?.image_list?.[0]) {
+      return res.status(500).json({ error: "Liblib 返回图片失败", statusResponse: statusData });
+    }
+
+    const imageUrl = statusData.data.image_list[0];
+    res.status(200).json({ imageUrl });
+  } catch (error) {
+    console.error("服务器错误：", error);
+    res.status(500).send("服务器内部错误");
+  }
+}
