@@ -1,6 +1,9 @@
 const fetch = require('node-fetch');
 const crypto = require('crypto');
 
+/**
+ * ComfyUI 图像生成接口代理
+ */
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -24,18 +27,18 @@ module.exports = async (req, res) => {
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
   const body = {
-    templateUuid: "4df2efa0f18d46dc9758803e478eb51c",  // 你的 workflow UUID
+    templateUuid: "4df2efa0f18d46dc9758803e478eb51c",
     generateParams: {
       "65": {
-        "class_type": "CLIPTextEncode",
-        "inputs": {
-          "text": promptText
+        class_type: "CLIPTextEncode",
+        inputs: {
+          text: promptText
         }
       },
       "74": {
-        "class_type": "CLIPTextEncode",
-        "inputs": {
-          "text": promptText
+        class_type: "CLIPTextEncode",
+        inputs: {
+          text: promptText
         }
       }
     }
