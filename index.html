@@ -76,43 +76,56 @@
   <div id="loading">🎨 图像生成中，请稍候...</div>
   <img id="resultImage" src="" alt="生成图像" />
 
-  <script>
-    async function generateImage() {
-      const flower = document.getElementById("flowerInput").value;
-      const jellyfish = document.getElementById("jellyfishInput").value;
+ <script>
+  async function generateImage() {
+    const flower = document.getElementById("flowerInput").value.trim();
+    const jellyfish = document.getElementById("jellyfishInput").value.trim();
 
-      if (!flower || !jellyfish) {
-        alert("请填写完整的提示词！");
-        return;
-      }
+    if (!flower || !jellyfish) {
+      alert("请填写完整的提示词！");
+      return;
+    }
 
-      document.getElementById("loading").style.display = "block";
-      document.getElementById("resultImage").style.display = "none";
+    document.getElementById("loading").style.display = "block";
+    document.getElementById("resultImage").style.display = "none";
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ flower, jellyfish }),
+      });
+
+      const text = await response.text();
 
       try {
-        const response = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ flower, jellyfish }),
-        });
+        const result = JSON.parse(text);
 
-        const result = await response.json();
         document.getElementById("loading").style.display = "none";
 
-        if (result.error) {
-          console.error("生成失败：", result.error);
-          alert("生成失败，请稍后再试！");
+        if (result.error || result.code !== 200) {
+          console.error("生成失败：", result);
+          alert("生成失败：" + (result.msg || "未知错误"));
         } else {
           const image = document.getElementById("resultImage");
           image.src = result.imageUrl;
           image.style.display = "block";
         }
-      } catch (error) {
+      } catch (jsonError) {
+        console.error("返回不是有效 JSON：", text);
         document.getElementById("loading").style.display = "none";
-        console.error("生成请求失败：", error);
-        alert("请求失败，请检查网络或稍后再试！");
+        alert("生成请求失败，返回内容不是 JSON：" + text);
       }
+
+    } catch (error) {
+      document.getElementById("loading").style.display = "none";
+      console.error("生成请求失败：", error);
+      alert("请求失败，请检查网络或稍后再试！");
     }
-  </script>
+  }
+</script>
+
 </body>
 </html>
