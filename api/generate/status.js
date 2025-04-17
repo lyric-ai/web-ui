@@ -21,26 +21,12 @@ export default async function handler(req, res) {
     });
 
     const text = await queryRes.text();
-    let data;
 
-    try {
-      data = JSON.parse(text);
-    } catch {
-      return res.status(500).json({ error: '返回内容非 JSON: ' + text });
-    }
+    // 🚨 原样输出 liblib 的全部响应内容（文本形式）
+    return res.status(200).json({
+      raw: text
+    });
 
-    if (!queryRes.ok || data?.code !== 0) {
-      return res.status(500).json({ error: data?.msg || '查询失败' });
-    }
-
-    const statusCode = data.data.generateStatus;
-    const imageUrl = data.data.images?.[0]?.imageUrl;
-
-    if (statusCode === 5 && imageUrl) {
-      return res.status(200).json({ status: 'done', imageUrl });
-    } else {
-      return res.status(200).json({ status: `状态码：${statusCode}` });
-    }
   } catch (err) {
     return res.status(500).json({ error: "查询失败：" + err.message });
   }
