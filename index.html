@@ -1,131 +1,62 @@
-   <!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Liblib ComfyUI 图像生成器</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>梦幻水母生成器</title>
   <style>
     body {
-      margin: 0;
+      font-family: sans-serif;
       padding: 2rem;
-      font-family: Arial, sans-serif;
-      background: #f3f4f6;
-      color: #333;
+      background: linear-gradient(to right, #a1c4fd, #c2e9fb);
       text-align: center;
     }
-    h1 {
-      color: #2563eb;
-    }
-    .input-group {
-      margin-bottom: 1rem;
-    }
-    label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-weight: bold;
-    }
-    input {
-      padding: 0.5rem;
-      width: 300px;
-      max-width: 90%;
+    input, button {
+      padding: 10px;
+      margin: 10px;
       font-size: 1rem;
-      border-radius: 0.375rem;
-      border: 1px solid #ccc;
     }
-    button {
-      padding: 0.6rem 1.2rem;
-      font-size: 1rem;
-      background-color: #3b82f6;
-      color: white;
-      border: none;
-      border-radius: 0.375rem;
-      cursor: pointer;
-      margin-top: 1rem;
-    }
-    button:hover {
-      background-color: #2563eb;
-    }
-    #loading {
-      margin-top: 1.5rem;
-      display: none;
-    }
-    #resultImage {
+    #result {
       margin-top: 2rem;
-      display: none;
-      max-width: 80%;
-      border-radius: 1rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      font-size: 1.2rem;
+      color: #333;
     }
   </style>
 </head>
 <body>
-  <h1>🌈 ComfyUI 图像生成器</h1>
+  <h1>梦幻水母生成器</h1>
+  <p>请输入关键词：</p>
+  <input type="text" id="flower" placeholder="鲜花关键词" />
+  <input type="text" id="jellyfish" placeholder="水母关键词" />
+  <br />
+  <button onclick="generate()">开始生成</button>
+  <div id="result"></div>
 
-  <div class="input-group">
-    <label for="flowerInput">🌸 花朵提示词（flower）</label>
-    <input type="text" id="flowerInput" placeholder="如 dream, glow, fantasy..." />
-  </div>
-
-  <div class="input-group">
-    <label for="jellyfishInput">🌊 水母提示词（jellyfish）</label>
-    <input type="text" id="jellyfishInput" placeholder="如 light, sky, cosmic..." />
-  </div>
-
-  <button onclick="generateImage()">✨ 生成图像</button>
-
-  <div id="loading">🎨 图像生成中，请稍候...</div>
-  <img id="resultImage" src="" alt="生成图像" />
-
- <script>
-  async function generateImage() {
-    const flower = document.getElementById("flowerInput").value.trim();
-    const jellyfish = document.getElementById("jellyfishInput").value.trim();
-
-    if (!flower || !jellyfish) {
-      alert("请填写完整的提示词！");
-      return;
-    }
-
-    document.getElementById("loading").style.display = "block";
-    document.getElementById("resultImage").style.display = "none";
-
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ flower, jellyfish }),
-      });
-
-      const text = await response.text();
+  <script>
+    async function generate() {
+      const flower = document.getElementById('flower').value.trim();
+      const jellyfish = document.getElementById('jellyfish').value.trim();
+      const result = document.getElementById('result');
+      result.textContent = "生成中...";
 
       try {
-        const result = JSON.parse(text);
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ flower, jellyfish })
+        });
 
-        document.getElementById("loading").style.display = "none";
-
-        if (result.error || result.code !== 200) {
-          console.error("生成失败：", result);
-          alert("生成失败：" + (result.msg || "未知错误"));
-        } else {
-          const image = document.getElementById("resultImage");
-          image.src = result.imageUrl;
-          image.style.display = "block";
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || '生成失败');
         }
-      } catch (jsonError) {
-        console.error("返回不是有效 JSON：", text);
-        document.getElementById("loading").style.display = "none";
-        alert("生成请求失败，返回内容不是 JSON：" + text);
+
+        result.innerHTML = `🎉 任务提交成功！<br>生成 UUID: <code>${data.generateUuid}</code>`;
+      } catch (err) {
+        console.error(err);
+        result.textContent = "❌ 出错了：" + err.message;
       }
-
-    } catch (error) {
-      document.getElementById("loading").style.display = "none";
-      console.error("生成请求失败：", error);
-      alert("请求失败，请检查网络或稍后再试！");
     }
-  }
-</script>
-
+  </script>
 </body>
 </html>
