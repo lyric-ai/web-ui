@@ -7,12 +7,10 @@ export default async function handler(req, res) {
   }
 
   const { generateUuid } = req.body;
-
   if (!generateUuid) {
     return res.status(400).json({ error: '缺少 generateUuid 参数' });
   }
 
-  // ✅ 密钥信息（和 generate.js 保持一致）
   const accessKey = "NRXABtFaq2nlj-fRV4685Q";
   const secretKey = "VnS-NP3SKlOgws0zGW8OfkpOm-vohzvf";
   const uri = "/api/generate/comfy/status";
@@ -46,11 +44,26 @@ export default async function handler(req, res) {
     });
 
     const text = await queryRes.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return res.status(500).json({ error: "返回内容不是 JSON：" + text });
+    }
 
-    // 🚨 保留调试返回，便于你继续查看响应结构
-    return res.status(200).json({ raw: text });
+    const status = data.data?.generateStatus;
+    const imageUrl = data.data?.images?.[0]?.imageUrl;
+
+    if (status === 5 && imageUrl) {
+      return res.status(200).json({ status: 'done', imageUrl });
+    } else {
+      return res.status(200).json({
+        status: `生成中 (${status})`,
+        percent: data.data?.percentCompleted ?? 0
+      });
+    }
 
   } catch (err) {
-    return res.status(500).json({ error: "请求失败：" + err.message });
+    return res.status(500).json({ error: "查询失败：" + err.message });
   }
 }
